@@ -1,0 +1,40 @@
+# Global code owners
+* @terragon-labs/core-team
+
+# Privacy and security critical files
+/privacy_finetuner/privacy/ @terragon-labs/privacy-team @terragon-labs/security-team
+/privacy_finetuner/security/ @terragon-labs/security-team
+scripts/privacy_compliance_check.py @terragon-labs/privacy-team
+SECURITY.md @terragon-labs/security-team
+
+# CI/CD and infrastructure
+/.github/ @terragon-labs/devops-team @terragon-labs/core-team
+/docs/workflows/ @terragon-labs/devops-team
+Dockerfile @terragon-labs/devops-team
+docker-compose.yml @terragon-labs/devops-team
+Makefile @terragon-labs/devops-team
+
+# Build and packaging
+pyproject.toml @terragon-labs/core-team @terragon-labs/devops-team
+poetry.lock @terragon-labs/core-team
+setup.py @terragon-labs/core-team
+
+# Testing
+/tests/ @terragon-labs/qa-team @terragon-labs/core-team
+pytest.ini @terragon-labs/qa-team
+.pre-commit-config.yaml @terragon-labs/qa-team
+
+# Documentation
+README.md @terragon-labs/docs-team @terragon-labs/core-team
+CONTRIBUTING.md @terragon-labs/docs-team
+CODE_OF_CONDUCT.md @terragon-labs/docs-team
+ARCHITECTURE.md @terragon-labs/architecture-team @terragon-labs/core-team
+/docs/ @terragon-labs/docs-team
+
+# Monitoring and observability
+/monitoring/ @terragon-labs/sre-team @terragon-labs/devops-team
+scripts/release.py @terragon-labs/devops-team
+
+# License and legal
+LICENSE @terragon-labs/legal-team
+CHANGELOG.md @terragon-labs/core-team @terragon-labs/docs-team

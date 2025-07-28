@@ -1,0 +1,151 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy-staging:
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: staging-deployment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment"
+          # Example deployment commands
+          aws ecs update-service \
+            --cluster privacy-finetuner-staging \
+            --service privacy-finetuner-service \
+            --force-new-deployment
+      
+      - name: Wait for deployment
+        run: |
+          aws ecs wait services-stable \
+            --cluster privacy-finetuner-staging \
+            --services privacy-finetuner-service
+      
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests"
+          # Add smoke test commands here
+          curl -f https://staging.privacy-finetuner.terragon-labs.com/health || exit 1
+      
+      - name: Run privacy compliance check
+        run: |
+          python scripts/privacy_compliance_check.py --environment staging
+      
+      - name: Notify deployment success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "🚀 Staging deployment successful for ${{ github.sha }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  deploy-production:
+    if: github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    needs: [deploy-staging]
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Production deployment approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: terragon-admins
+          minimum-approvals: 2
+          issue-title: "Production Deployment: ${{ github.sha }}"
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      
+      - name: Blue-Green deployment
+        run: |
+          echo "Starting blue-green deployment to production"
+          # Example blue-green deployment
+          # 1. Deploy to green environment
+          aws ecs update-service \
+            --cluster privacy-finetuner-production \
+            --service privacy-finetuner-green \
+            --force-new-deployment
+          
+          # 2. Wait for green deployment
+          aws ecs wait services-stable \
+            --cluster privacy-finetuner-production \
+            --services privacy-finetuner-green
+      
+      - name: Run health checks
+        run: |
+          echo "Running health checks"
+          # Health check commands
+          curl -f https://green.privacy-finetuner.terragon-labs.com/health || exit 1
+          curl -f https://green.privacy-finetuner.terragon-labs.com/metrics || exit 1
+      
+      - name: Switch traffic to green
+        run: |
+          echo "Switching traffic to green environment"
+          # Update load balancer to point to green
+          aws elbv2 modify-listener \
+            --listener-arn ${{ secrets.PRODUCTION_LISTENER_ARN }} \
+            --default-actions Type=forward,TargetGroupArn=${{ secrets.GREEN_TARGET_GROUP_ARN }}
+      
+      - name: Monitor deployment
+        run: |
+          echo "Monitoring deployment for 10 minutes"
+          sleep 600
+          # Check error rates, response times, etc.
+      
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Rolling back to blue environment"
+          aws elbv2 modify-listener \
+            --listener-arn ${{ secrets.PRODUCTION_LISTENER_ARN }} \
+            --default-actions Type=forward,TargetGroupArn=${{ secrets.BLUE_TARGET_GROUP_ARN }}
+      
+      - name: Notify deployment result
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: "🎯 Production deployment ${{ job.status }} for ${{ github.sha }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
