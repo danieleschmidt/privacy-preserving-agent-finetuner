@@ -1,0 +1,127 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, "3.10", "3.11", "3.12"]
+    
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+      
+      - name: Install dependencies
+        run: poetry install --with dev
+      
+      - name: Run linting
+        run: |
+          poetry run ruff check .
+          poetry run black --check .
+          poetry run isort --check-only .
+          poetry run mypy privacy_finetuner/
+      
+      - name: Run tests
+        run: |
+          poetry run pytest tests/ -v --cov=privacy_finetuner --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+      
+      - name: Run Bandit
+        run: |
+          pip install bandit
+          bandit -r privacy_finetuner/ -f json -o bandit-report.json
+      
+      - name: Run Safety
+        run: |
+          pip install safety
+          safety check --json --output safety-report.json
+      
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  privacy-compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      
+      - name: Install dependencies
+        run: poetry install --with dev
+      
+      - name: Run privacy compliance checks
+        run: |
+          poetry run python scripts/privacy_compliance_check.py
+      
+      - name: Privacy budget validation
+        run: |
+          poetry run pytest tests/ -m privacy -v
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: |
+          docker build -t privacy-finetuner:test .
+          docker run --rm privacy-finetuner:test python -c "import privacy_finetuner; print('Import successful')"
+      
+      - name: Test multi-stage build
+        run: |
+          docker build --target production -t privacy-finetuner:prod .
+          docker build --target development -t privacy-finetuner:dev .
