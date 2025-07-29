@@ -1,0 +1,145 @@
+name: Privacy Concern
+description: Report a privacy-related issue or concern
+title: "[PRIVACY] "
+labels: ["privacy", "security", "needs-review"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Privacy Concern Report
+        
+        Thank you for helping us maintain strong privacy protections. 
+        Please provide detailed information about the privacy concern.
+        
+        **🔒 This is a confidential report that will be handled with appropriate sensitivity.**
+
+  - type: dropdown
+    id: privacy_level
+    attributes:
+      label: Privacy Level
+      description: What level of privacy concern is this?
+      options:
+        - Critical - Data exposure or privacy guarantee violation
+        - High - Potential privacy risk requiring immediate attention
+        - Medium - Privacy best practice improvement needed
+        - Low - Privacy documentation or process improvement
+    validations:
+      required: true
+
+  - type: dropdown
+    id: privacy_category
+    attributes:
+      label: Privacy Category
+      description: What type of privacy concern is this?
+      options:
+        - Differential Privacy - ε-δ guarantee violations
+        - Data Protection - Unauthorized data access/exposure
+        - Context Protection - PII leakage in prompts/outputs
+        - Federated Learning - Client data isolation issues
+        - Secure Compute - Enclave or hardware security issues
+        - Compliance - GDPR, HIPAA, CCPA violations
+        - Model Privacy - Model inversion or membership inference
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: privacy_description
+    attributes:
+      label: Privacy Concern Description
+      description: Detailed description of the privacy concern
+      placeholder: |
+        Please describe:
+        1. What privacy issue you've identified
+        2. Where/when it occurs
+        3. What data might be at risk
+        4. Potential impact on users
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this privacy concern?
+      placeholder: |
+        1. Configure privacy settings...
+        2. Run training with...
+        3. Observe privacy budget...
+        4. Notice issue...
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected_privacy
+    attributes:
+      label: Expected Privacy Behavior
+      description: What should happen instead?
+      placeholder: Privacy guarantees should be maintained according to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: privacy_evidence
+    attributes:
+      label: Evidence
+      description: Any logs, configurations, or evidence of the privacy concern
+      placeholder: |
+        Please include:
+        - Relevant log entries
+        - Configuration files
+        - Privacy budget consumption
+        - Error messages
+        - Screenshots (if applicable)
+    validations:
+      required: false
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Where did you observe this privacy concern?
+      options:
+        - Development
+        - Testing
+        - Staging
+        - Production
+        - Local Machine
+        - CI/CD Pipeline
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version were you using?
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy_checklist
+    attributes:
+      label: Privacy Checklist
+      description: Please confirm you've checked these items
+      options:
+        - label: I have verified this is a legitimate privacy concern
+          required: true
+        - label: I have not included actual sensitive data in this report
+          required: true
+        - label: I understand this report will be handled confidentially
+          required: true
+        - label: I have checked if this is already a known issue
+          required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other context about the privacy concern
+      placeholder: Add any other context about the problem here.
+    validations:
+      required: false
