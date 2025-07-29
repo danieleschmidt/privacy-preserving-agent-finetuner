@@ -1,0 +1,19 @@
+# Trivy ignore file for known acceptable vulnerabilities
+# Add CVE IDs that are acceptable risks or false positives
+
+# Development dependencies - low severity acceptable
+# Example: CVE-2023-XXXXX (Development dependency with low impact)
+
+# Python base image vulnerabilities that are patched in latest versions
+# or not applicable to our use case
+
+# Example entries (uncomment and customize as needed):
+# CVE-2023-12345   # Low severity dev dependency
+# CVE-2023-67890   # Fixed in runtime but not reflected in scan
+
+# Privacy-specific exemptions
+# (Add specific CVEs that don't apply to privacy-preserving ML workloads)
+
+# Note: Only add entries here after careful security review
+# All entries should include justification comments
+# Review this file regularly and remove obsolete entries

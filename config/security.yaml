@@ -1,0 +1,279 @@
+# Advanced Security Scanner Configuration
+
+scanners:
+  bandit:
+    enabled: true
+    severity: medium
+    confidence: medium
+    skip_tests:
+      - B101  # assert_used
+      - B601  # paramiko_calls
+    
+  safety:
+    enabled: true
+    api_key: null  # Set via environment variable SAFETY_API_KEY
+    ignore_vulnerabilities: []
+    
+  semgrep:
+    enabled: true
+    rules:
+      - python
+      - security
+      - privacy
+    custom_rules: []
+    
+  secrets:
+    enabled: true
+    entropy_threshold: 4.5
+    allow_verified_secrets: false
+    baseline_file: .secrets.baseline
+    
+  dependencies:
+    enabled: true
+    sources:
+      - pypi
+      - npm
+    check_dev_dependencies: true
+    
+  container:
+    enabled: true
+    registry_scan: true
+    dockerfile_rules: true
+    
+  infrastructure:
+    enabled: true
+    terraform_scan: true
+    kubernetes_scan: true
+    docker_compose_scan: true
+    
+  privacy_specific:
+    enabled: true
+    check_data_handling: true
+    check_privacy_parameters: true
+    check_unsafe_operations: true
+
+# Security thresholds (maximum allowed)
+thresholds:
+  critical: 0    # No critical issues allowed
+  high: 5        # Maximum 5 high severity issues
+  medium: 20     # Maximum 20 medium severity issues
+  low: 50        # Maximum 50 low severity issues
+
+# File and directory exclusions
+exclusions:
+  files:
+    - "tests/**"
+    - "docs/**"
+    - "scripts/test_*.py"
+    - "**/__pycache__/**"
+    - "**/.pytest_cache/**"
+    - "**/.mypy_cache/**"
+    - "**/.ruff_cache/**"
+  
+  directories:
+    - ".git"
+    - ".github"
+    - "__pycache__"
+    - ".pytest_cache"
+    - ".mypy_cache"
+    - ".ruff_cache"
+    - "htmlcov"
+    - "dist"
+    - "build"
+    
+  rules:
+    # Skip specific rules that are false positives
+    - "B404"  # subprocess without shell
+    - "B603"  # subprocess without shell
+
+# Reporting configuration
+reporting:
+  formats:
+    - json
+    - sarif
+    - html
+  output_dir: security-reports
+  include_suppressed: false
+  group_by_severity: true
+
+# Privacy-specific security rules
+privacy_rules:
+  data_handling:
+    # Detect personal data in logs
+    - pattern: "print.*(?:email|phone|ssn|credit_card|personal_data)"
+      severity: high
+      message: "Personal data detected in print statement"
+    
+    - pattern: "logging.*(?:email|phone|ssn|credit_card|personal_data)"
+      severity: high
+      message: "Personal data detected in log statement"
+    
+    - pattern: "console\.log.*(?:email|phone|ssn|credit_card|personal_data)"
+      severity: high
+      message: "Personal data detected in console log"
+  
+  privacy_parameters:
+    # Check for unsafe privacy parameters
+    - pattern: "epsilon\s*=\s*([2-9][0-9]|[1-9][0-9]{2,})"
+      severity: medium
+      message: "Large epsilon value may compromise privacy"
+    
+    - pattern: "delta\s*=\s*[0-9]*\.?[0-9]*e-[0-3]"
+      severity: medium
+      message: "Large delta value may compromise privacy"
+    
+    - pattern: "noise_multiplier\s*=\s*0\.?[0-4]"
+      severity: high
+      message: "Low noise multiplier may compromise privacy"
+  
+  unsafe_operations:
+    # Detect unsafe deserialization
+    - pattern: "pickle\.load"
+      severity: high
+      message: "Unsafe pickle deserialization"
+    
+    - pattern: "yaml\.load(?!\s*\(.*,\s*Loader=yaml\.SafeLoader\))"
+      severity: high
+      message: "Unsafe YAML loading"
+    
+    # Code injection risks
+    - pattern: "eval\s*\("
+      severity: critical
+      message: "Code injection risk via eval()"
+    
+    - pattern: "exec\s*\("
+      severity: critical
+      message: "Code injection risk via exec()"
+
+# Network security rules
+network_security:
+  ssl_verification:
+    - pattern: "verify\s*=\s*False"
+      severity: high
+      message: "SSL verification disabled"
+    
+    - pattern: "ssl_verify\s*=\s*False"
+      severity: high
+      message: "SSL verification disabled"
+    
+    - pattern: "check_cert\s*=\s*False"
+      severity: high
+      message: "Certificate verification disabled"
+  
+  insecure_protocols:
+    - pattern: "http://"
+      severity: medium
+      message: "Insecure HTTP protocol"
+    
+    - pattern: "ftp://"
+      severity: medium
+      message: "Insecure FTP protocol"
+
+# Container security rules
+container_security:
+  dockerfile_rules:
+    - pattern: "FROM.*:latest"
+      severity: medium
+      message: "Using latest tag is not recommended"
+    
+    - pattern: "USER root"
+      severity: high
+      message: "Running as root user"
+    
+    - pattern: "ADD .*\\.tar"
+      severity: medium
+      message: "Using ADD with tar files"
+  
+  compose_rules:
+    - pattern: "privileged:\\s*true"
+      severity: high
+      message: "Privileged container detected"
+    
+    - pattern: "--privileged"
+      severity: high
+      message: "Privileged container detected"
+
+# Infrastructure security rules
+infrastructure_security:
+  kubernetes:
+    - pattern: "allowPrivilegeEscalation:\\s*true"
+      severity: high
+      message: "Privilege escalation allowed"
+    
+    - pattern: "runAsRoot:\\s*true"
+      severity: medium
+      message: "Container running as root"
+    
+    - pattern: "hostNetwork:\\s*true"
+      severity: medium
+      message: "Host network access enabled"
+  
+  terraform:
+    - pattern: "public_read"
+      severity: high
+      message: "Public read access enabled"
+    
+    - pattern: "0\\.0\\.0\\.0/0"
+      severity: high
+      message: "Open to all IPs (0.0.0.0/0)"
+
+# Custom rule sets for specific frameworks
+framework_rules:
+  django:
+    - pattern: "DEBUG\\s*=\\s*True"
+      severity: medium
+      message: "Debug mode enabled in production"
+  
+  flask:
+    - pattern: "app\\.debug\\s*=\\s*True"
+      severity: medium
+      message: "Debug mode enabled"
+  
+  fastapi:
+    - pattern: "debug=True"
+      severity: medium
+      message: "Debug mode enabled"
+
+# Compliance mappings
+compliance_mappings:
+  gdpr:
+    - category: "privacy_security"
+      requirements: ["Article 32", "Article 25"]
+  
+  hipaa:
+    - category: "static_analysis"
+      requirements: ["164.312(a)(1)", "164.312(e)(1)"]
+  
+  iso27001:
+    - category: "dependency_vulnerability"
+      requirements: ["A.12.6.1", "A.14.2.3"]
+
+# Integration settings
+integrations:
+  github:
+    enabled: true
+    upload_sarif: true
+    create_issues: false
+  
+  slack:
+    enabled: false
+    webhook_url: null
+    channel: "#security"
+  
+  jira:
+    enabled: false
+    server: null
+    project_key: "SEC"
+  
+  email:
+    enabled: false
+    smtp_server: null
+    recipients: []
+
+# Advanced settings
+advanced:
+  parallel_scans: true
+  max_workers: 6
+  timeout_seconds: 1800
+  cache_results: true
+  cache_duration_hours: 24
