@@ -1,0 +1,80 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 2%
+        base: auto
+        flags:
+          - unittests
+        paths:
+          - "privacy_finetuner"
+    patch:
+      default:
+        target: 75%
+        threshold: 5%
+        base: auto
+        flags:
+          - unittests
+
+  ignore:
+    - "tests"
+    - "scripts"
+    - "docs"
+    - "**/__init__.py"
+    - "**/migrations/**"
+    - "**/alembic/**"
+
+comment:
+  layout: "reach,diff,flags,tree,reach"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+
+github_checks:
+  annotations: true
+
+flags:
+  unittests:
+    paths:
+      - privacy_finetuner/
+    carryforward: true
+  integration:
+    paths:
+      - privacy_finetuner/
+    carryforward: false
+  privacy:
+    paths:
+      - privacy_finetuner/privacy/
+      - privacy_finetuner/context/
+    carryforward: true
+
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: 80%
+      - type: patch
+        target: 75%
+  individual_components:
+    - component_id: privacy_engine
+      name: Privacy Engine
+      paths:
+        - privacy_finetuner/privacy/**
+      flags:
+        - privacy
+    - component_id: context_guard
+      name: Context Guard
+      paths:
+        - privacy_finetuner/context/**
+      flags:
+        - privacy
+    - component_id: federated
+      name: Federated Learning
+      paths:
+        - privacy_finetuner/federated/**
+    - component_id: secure_compute
+      name: Secure Computing
+      paths:
+        - privacy_finetuner/secure_compute/**

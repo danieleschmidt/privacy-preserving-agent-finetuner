@@ -1,0 +1,89 @@
+# Trivy configuration for container and filesystem scanning
+# https://aquasecurity.github.io/trivy/
+
+# General settings
+format: sarif
+template: "@contrib/sarif.tpl"
+timeout: 15m0s
+cache-dir: /tmp/trivy-cache
+quiet: false
+debug: false
+skip-update: false
+skip-java-db-update: false
+
+# Vulnerability settings
+exit-code: 0
+skip-files:
+  - "**/*.md"
+  - "**/LICENSE"
+  - "**/.git/**"
+  - "**/tests/**"
+  - "**/test_*.py"
+  - "**/conftest.py"
+  - "**/docs/**"
+
+skip-dirs:
+  - ".git"
+  - ".github"
+  - "docs"
+  - "tests" 
+  - "__pycache__"
+  - ".pytest_cache"
+  - ".mypy_cache"
+  - ".ruff_cache"
+  - "htmlcov"
+  - "node_modules"
+
+# Vulnerability database
+vuln-type:
+  - os
+  - library
+
+# Security scanners
+security-checks:
+  - vuln
+  - config
+  - secret
+
+# Severity levels to report
+severity:
+  - UNKNOWN
+  - LOW  
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+
+# Ignore specific vulnerabilities (use with caution)
+ignorefile: .trivyignore
+
+# License scanning
+license-full: false
+
+# Secret scanning
+secret:
+  config: trivy-secret.yaml
+
+# Misconfiguration scanning  
+config:
+  check-namespaces:
+    - builtin.kubernetes.*
+    - builtin.dockerfile.*
+    - builtin.docker.*
+
+# Output settings
+list-all-pkgs: false
+compliance: docker-cis
+
+# Cache settings
+cache:
+  clear: false
+  backend: fs
+
+# Registry settings
+registry:
+  token: ""
+  username: ""
+  password: ""
+
+# Report settings
+report: all
