@@ -1,193 +1,72 @@
-name: Performance Optimization
-description: Report performance issues or suggest optimizations
+name: 🚀 Performance Optimization Request
+description: Request performance improvements for privacy-preserving training
 title: "[PERF] "
 labels: ["performance", "optimization", "enhancement"]
-assignees: []
 
 body:
   - type: markdown
     attributes:
       value: |
-        ## ⚡ Performance Optimization Request
+        ## Performance Optimization Request
         
-        Help us improve the performance of the privacy-preserving agent finetuner.
-        Please provide detailed performance metrics and context.
+        Help us improve the performance of privacy-preserving training while maintaining privacy guarantees.
 
   - type: dropdown
-    id: performance_category
+    id: performance_area
     attributes:
-      label: Performance Category
-      description: What aspect of performance needs optimization?
+      label: Performance Area
+      description: Which area needs performance optimization?
       options:
-        - Training Speed - Model training performance
-        - Inference Speed - Model inference performance
-        - Memory Usage - RAM/GPU memory optimization
-        - Privacy Computation - DP-SGD, noise generation overhead
-        - I/O Performance - Data loading, storage operations
-        - Network Performance - Distributed training, API calls
-        - Context Protection - PII removal, encryption overhead
-        - Database Performance - Query optimization
-        - General Application - Overall application performance
-        - Build/CI Performance - Development workflow speed
+        - Training Speed - DP-SGD training optimization
+        - Memory Usage - Reduce memory consumption
+        - Privacy Overhead - Minimize privacy computation cost
+        - Model Inference - Faster private inference
+        - Data Loading - Dataset preprocessing optimization
+        - GPU Utilization - Better hardware utilization
+        - Federated Learning - Distributed training efficiency
+        - Context Protection - Faster PII redaction
+        - Other
     validations:
       required: true
 
   - type: dropdown
     id: priority
     attributes:
-      label: Priority
-      description: How critical is this performance issue?
+      label: Priority Level
+      description: How critical is this performance optimization?
       options:
-        - Critical - Blocking users or making system unusable
-        - High - Significantly impacting user experience
-        - Medium - Noticeable performance degradation
-        - Low - Minor optimization opportunity
+        - Critical - Blocking production use
+        - High - Significant impact on user experience
+        - Medium - Noticeable improvement needed
+        - Low - Nice-to-have optimization
     validations:
       required: true
 
   - type: textarea
     id: current_performance
     attributes:
-      label: Current Performance
-      description: Describe the current performance characteristics
+      label: Current Performance Metrics
+      description: What are the current performance characteristics?
       placeholder: |
-        Please include specific metrics:
+        Current metrics:
         - Training speed: X tokens/second
         - Memory usage: X GB
-        - Processing time: X seconds
+        - Privacy overhead: X% slower than non-private
+        - Model size: X parameters
+        - Hardware: GPU/CPU specifications
+    validations:
+      required: true
+
+  - type: textarea
+    id: target_performance
+    attributes:
+      label: Target Performance Goals
+      description: What performance targets would you like to achieve?
+      placeholder: |
+        Target improvements:
+        - Training speed: X% faster
+        - Memory usage: X% reduction
+        - Privacy overhead: X% reduction
         - Throughput: X requests/second
-        - Privacy budget consumption rate: X ε/hour
-        
-        Include any relevant benchmarks or profiling data.
     validations:
       required: true
-
-  - type: textarea
-    id: expected_performance
-    attributes:
-      label: Expected Performance
-      description: What performance would you expect or need?
-      placeholder: |
-        Target performance goals:
-        - Training speed: Y tokens/second
-        - Memory usage: Y GB
-        - Processing time: Y seconds
-        - Throughput: Y requests/second
-        
-        Include reasoning for these targets.
-    validations:
-      required: true
-
-  - type: textarea
-    id: performance_analysis
-    attributes:
-      label: Performance Analysis
-      description: Have you identified any performance bottlenecks?
-      placeholder: |
-        Performance analysis findings:
-        - Profiling results
-        - Bottleneck identification
-        - Resource utilization patterns
-        - Specific functions/operations that are slow
-    validations:
-      required: false
-
-  - type: textarea
-    id: reproduction_steps
-    attributes:
-      label: Steps to Reproduce Performance Issue
-      description: How can we reproduce this performance issue?
-      placeholder: |
-        1. Configure system with...
-        2. Load dataset of size...
-        3. Run training/inference with...
-        4. Measure performance using...
-        5. Observe slow performance in...
-    validations:
-      required: true
-
-  - type: dropdown
-    id: environment
-    attributes:
-      label: Environment
-      description: In what environment did you observe this performance issue?
-      options:
-        - Local Development
-        - CI/CD Pipeline
-        - Testing Environment
-        - Staging Environment
-        - Production Environment
-        - Cloud Platform (specify in additional context)
-    validations:
-      required: true
-
-  - type: textarea
-    id: system_specs
-    attributes:
-      label: System Specifications
-      description: What are the system specifications where you observed this issue?
-      placeholder: |
-        Hardware:
-        - CPU: 
-        - RAM: 
-        - GPU: 
-        - Storage: 
-        
-        Software:
-        - OS: 
-        - Python version: 
-        - PyTorch version: 
-        - CUDA version: 
-        
-        Configuration:
-        - Model size: 
-        - Batch size: 
-        - Precision: 
-        - Privacy parameters: 
-    validations:
-      required: true
-
-  - type: textarea
-    id: optimization_suggestions
-    attributes:
-      label: Optimization Suggestions
-      description: Do you have any suggestions for optimization?
-      placeholder: |
-        Potential optimizations:
-        - Algorithm improvements
-        - Caching strategies
-        - Parallel processing
-        - Memory management
-        - Hardware utilization
-        - Code optimizations
-    validations:
-      required: false
-
-  - type: checkboxes
-    id: performance_checklist
-    attributes:
-      label: Performance Checklist
-      description: Please confirm you've checked these items
-      options:
-        - label: I have provided specific performance metrics
-          required: true
-        - label: I have included system specifications
-          required: true
-        - label: I have provided steps to reproduce the performance issue
-          required: true
-        - label: I have checked if this is a known performance issue
-          required: false
-
-  - type: textarea
-    id: additional_context
-    attributes:
-      label: Additional Context
-      description: Any other context about this performance issue
-      placeholder: |
-        Add any other relevant information:
-        - Performance comparison with other systems
-        - Business impact of the performance issue
-        - Timeline requirements
-        - Related performance issues
-    validations:
-      required: false
