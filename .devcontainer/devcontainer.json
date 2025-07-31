@@ -33,7 +33,12 @@
         "ms-vscode.vscode-markdown",
         "davidanson.vscode-markdownlint",
         "bierner.markdown-mermaid",
-        "ms-vscode.live-server"
+        "ms-vscode.live-server",
+        "charliermarsh.ruff",
+        "ms-python.bandit",
+        "tamasfe.even-better-toml",
+        "ms-vscode.makefile-tools",
+        "humao.rest-client"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
