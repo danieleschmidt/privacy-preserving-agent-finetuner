@@ -1,112 +1,107 @@
 {
-  "name": "Privacy-Preserving Agent Finetuner",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "18"
-    },
-    "ghcr.io/devcontainers/features/cuda:1": {
-      "version": "12.2"
-    }
-  },
+  "name": "Privacy-Preserving Agent Fine-Tuner",
+  "dockerComposeFile": "../docker-compose.dev.yml",
+  "service": "privacy-finetuner-dev",
+  "workspaceFolder": "/workspace",
+  
   "customizations": {
     "vscode": {
-      "extensions": [
-        "ms-python.python",
-        "ms-python.black-formatter",
-        "ms-python.isort",
-        "ms-python.flake8",
-        "ms-python.mypy-type-checker",
-        "ms-toolsai.jupyter",
-        "ms-vscode.vscode-json",
-        "redhat.vscode-yaml",
-        "ms-azuretools.vscode-docker",
-        "github.vscode-pull-request-github",
-        "github.copilot",
-        "ms-vscode.test-adapter-converter",
-        "ms-python.pytest",
-        "gruntfuggly.todo-tree",
-        "eamodio.gitlens",
-        "ms-vscode.vscode-markdown",
-        "davidanson.vscode-markdownlint",
-        "bierner.markdown-mermaid",
-        "ms-vscode.live-server",
-        "charliermarsh.ruff",
-        "ms-python.bandit",
-        "tamasfe.even-better-toml",
-        "ms-vscode.makefile-tools",
-        "humao.rest-client"
-      ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.defaultInterpreterPath": "/opt/conda/bin/python",
         "python.linting.enabled": true,
         "python.linting.pylintEnabled": false,
-        "python.linting.flake8Enabled": true,
+        "python.linting.ruffEnabled": true,
         "python.linting.mypyEnabled": true,
         "python.formatting.provider": "black",
-        "python.formatting.blackArgs": ["--line-length=88"],
-        "python.sortImports.args": ["--profile=black"],
+        "python.sortImports.provider": "isort",
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
-        "python.testing.pytestArgs": ["tests"],
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
           "source.organizeImports": true,
           "source.fixAll": true
         },
-        "files.associations": {
-          "*.yml": "yaml",
-          "*.yaml": "yaml",
-          "Dockerfile*": "dockerfile",
-          ".env*": "properties"
-        },
-        "git.autofetch": true,
-        "git.enableSmartCommit": true,
-        "terminal.integrated.defaultProfile.linux": "bash",
-        "workbench.colorTheme": "Default Dark+",
-        "security.workspace.trust.untrustedFiles": "open"
-      }
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.pytest_cache": true,
+          "**/node_modules": true,
+          "**/.git": false
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "charliermarsh.ruff",
+        "ms-vscode.makefile-tools",
+        "ms-azuretools.vscode-docker",
+        "GitHub.copilot",
+        "redhat.vscode-yaml",
+        "ms-vscode.vscode-json",
+        "esbenp.prettier-vscode",
+        "tamasfe.even-better-toml"
+      ]
     }
   },
-  "forwardPorts": [8080, 9090, 5432, 6379],
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "configureZshAsDefaultShell": true,
+      "username": "vscode",
+      "userUid": "1000",
+      "userGid": "1000"
+    }
+  },
+
+  "forwardPorts": [8080, 3000, 9090, 6379, 5432, 8888],
+  
   "portsAttributes": {
     "8080": {
-      "label": "API Server",
+      "label": "Privacy Fine-tuner API",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Frontend Dev Server", 
       "onAutoForward": "notify"
     },
     "9090": {
-      "label": "Metrics",
-      "onAutoForward": "silent"
+      "label": "Prometheus Metrics",
+      "onAutoForward": "ignore"
     },
-    "5432": {
-      "label": "PostgreSQL",
-      "onAutoForward": "silent"
-    },
-    "6379": {
-      "label": "Redis",
-      "onAutoForward": "silent"
+    "8888": {
+      "label": "Jupyter Notebooks",
+      "onAutoForward": "notify"
     }
   },
-  "postCreateCommand": "pip install poetry && poetry install --with dev,docs && pre-commit install",
-  "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
+
+  "postCreateCommand": ".devcontainer/setup.sh",
   "remoteUser": "vscode",
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-    "source=${localWorkspaceFolder}/.devcontainer/cache,target=/home/vscode/.cache,type=bind",
-    "source=${localWorkspaceFolder}/.devcontainer/models,target=/workspace/models,type=bind"
-  ],
+
   "containerEnv": {
-    "PYTHONPATH": "/workspaces/privacy-preserving-agent-finetuner",
-    "CUDA_VISIBLE_DEVICES": "0",
-    "TRANSFORMERS_CACHE": "/workspace/models",
-    "HF_HOME": "/workspace/models",
-    "TORCH_CACHE": "/workspace/models",
     "ENVIRONMENT": "development",
-    "DEBUG": "true"
+    "PYTHONPATH": "/workspace",
+    "PRIVACY_FINETUNER_DEV": "true",
+    "CUDA_VISIBLE_DEVICES": "0"
   },
-  "workspaceFolder": "/workspaces/privacy-preserving-agent-finetuner",
-  "shutdownAction": "stopContainer"
+
+  "mounts": [
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    "source=privacy-finetuner-models,target=/workspace/models,type=volume",
+    "source=privacy-finetuner-data,target=/workspace/data,type=volume"
+  ],
+
+  "shutdownAction": "stopCompose",
+  "overrideCommand": false,
+  "privileged": false,
+  "init": true
 }

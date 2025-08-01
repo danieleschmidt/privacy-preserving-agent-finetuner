@@ -1,0 +1,30 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+    "ms-vscode.makefile-tools",
+    "ms-azuretools.vscode-docker",
+    "GitHub.copilot",
+    "GitHub.copilot-chat",
+    "redhat.vscode-yaml",
+    "ms-vscode.vscode-json",
+    "esbenp.prettier-vscode",
+    "tamasfe.even-better-toml",
+    "ms-toolsai.jupyter",
+    "ms-toolsai.jupyter-keymap",
+    "ms-toolsai.jupyter-renderers",
+    "donjayamanne.githistory",
+    "eamodio.gitlens",
+    "ms-vscode.test-adapter-converter",
+    "ms-vscode.hexeditor",
+    "ms-vscode.vscode-json"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.pylint"
+  ]
+}
+EOF < /dev/null
