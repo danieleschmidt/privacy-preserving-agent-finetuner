@@ -1,0 +1,118 @@
+# Jupyter Notebook Environment for Privacy-Preserving ML Development
+# Optimized for research and experimentation with privacy-preserving techniques
+
+FROM jupyter/scipy-notebook:python-3.11
+
+# Switch to root for system installations
+USER root
+
+# Install system dependencies for privacy ML
+RUN apt-get update && apt-get install -y \
+    # Build tools
+    build-essential \
+    gcc \
+    g++ \
+    cmake \
+    # System utilities
+    curl \
+    wget \
+    git \
+    vim \
+    htop \
+    tree \
+    # Graphics and visualization
+    graphviz \
+    # Cleanup
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to jovyan user
+USER $NB_UID
+
+# Install Poetry for dependency management
+RUN pip install --user poetry==1.7.1
+ENV PATH="/home/jovyan/.local/bin:$PATH"
+
+# Configure Poetry
+RUN poetry config virtualenvs.create false
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy dependency files
+COPY --chown=$NB_UID:$NB_GID pyproject.toml poetry.lock* ./
+
+# Install Python dependencies
+RUN poetry install --with dev,docs --no-root
+
+# Additional privacy-specific packages for research
+RUN pip install --no-cache-dir \
+    # Differential privacy libraries
+    opacus \
+    tensorflow-privacy \
+    # Federated learning
+    flower \
+    # Privacy analysis tools
+    prv-accountant \
+    # Advanced ML libraries
+    transformers[torch] \
+    datasets \
+    accelerate \
+    # Visualization and analysis
+    seaborn \
+    plotly \
+    wandb \
+    tensorboard \
+    # Privacy research tools
+    scipy \
+    scikit-learn \
+    # Notebook extensions
+    ipywidgets \
+    jupyter-contrib-nbextensions \
+    jupyterlab-git
+
+# Enable Jupyter extensions
+RUN jupyter contrib nbextension install --user && \
+    jupyter nbextension enable --py widgetsnbextension
+
+# Configure Jupyter Lab extensions
+RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager
+
+# Create directories for privacy research
+RUN mkdir -p /workspace/{notebooks,data,models,experiments,results} && \
+    chown -R $NB_UID:$NB_GID /workspace
+
+# Copy example notebooks and tutorials
+COPY --chown=$NB_UID:$NB_GID notebooks/ /workspace/notebooks/
+COPY --chown=$NB_UID:$NB_GID examples/ /workspace/examples/
+
+# Install the privacy_finetuner package in development mode
+COPY --chown=$NB_UID:$NB_GID . /workspace/
+RUN pip install -e /workspace/
+
+# Create custom Jupyter kernel for privacy ML
+RUN python -m ipykernel install --user --name privacy-ml --display-name "Privacy-Preserving ML"
+
+# Configure Jupyter to trust notebooks by default (for development)
+RUN echo "c.NotebookApp.trust_xheaders = True" >> /home/jovyan/.jupyter/jupyter_notebook_config.py
+RUN echo "c.NotebookApp.disable_check_xsrf = True" >> /home/jovyan/.jupyter/jupyter_notebook_config.py
+
+# Set environment variables for privacy research
+ENV PRIVACY_RESEARCH_MODE=true \
+    JUPYTER_ENABLE_LAB=yes \
+    JUPYTER_TOKEN=dev-token-change-in-production \
+    PYTHONPATH=/workspace
+
+# Health check for Jupyter
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8888/api || exit 1
+
+# Expose Jupyter port
+EXPOSE 8888
+
+# Custom startup script
+COPY --chown=$NB_UID:$NB_GID scripts/jupyter-startup.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/jupyter-startup.sh
+
+# Default command
+CMD ["/usr/local/bin/jupyter-startup.sh"]

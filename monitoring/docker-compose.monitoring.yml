@@ -1,0 +1,296 @@
+version: '3.8'
+
+# Comprehensive monitoring stack for Privacy-Preserving Agent Fine-Tuner
+# Includes privacy-specific metrics, logging, and alerting
+
+services:
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: privacy-finetuner-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./privacy-alerts.yml:/etc/prometheus/privacy-alerts.yml:ro
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: privacy-finetuner-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin_change_me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-clock-panel,redis-datasource
+      GF_FEATURE_TOGGLES_ENABLE: "publicDashboards"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AlertManager for alert routing
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: privacy-finetuner-alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.advertise-address=0.0.0.0:9093'
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Loki for log aggregation
+  loki:
+    image: grafana/loki:2.8.0
+    container_name: privacy-finetuner-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Promtail for log collection
+  promtail:
+    image: grafana/promtail:2.8.0
+    container_name: privacy-finetuner-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.46
+    container_name: privacy-finetuner-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+      COLLECTOR_ZIPKIN_HOST_PORT: ":9411"
+    ports:
+      - "14268:14268"  # HTTP collector
+      - "16686:16686"  # Web UI
+      - "14250:14250"  # gRPC collector
+    volumes:
+      - jaeger-data:/tmp
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # ElasticSearch for privacy audit logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: privacy-finetuner-elasticsearch
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kibana for elasticsearch visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: privacy-finetuner-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      xpack.security.enabled: "false"
+    ports:
+      - "5601:5601"
+    networks:
+      - monitoring
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # InfluxDB for high-frequency privacy metrics
+  influxdb:
+    image: influxdb:2.7
+    container_name: privacy-finetuner-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-admin_change_me}
+      DOCKER_INFLUXDB_INIT_ORG: privacy-org
+      DOCKER_INFLUXDB_INIT_BUCKET: privacy-metrics
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-admin_token_change_me}
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Telegraf for metrics collection
+  telegraf:
+    image: telegraf:1.27
+    container_name: privacy-finetuner-telegraf
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/rootfs/sys:ro
+      - /proc:/rootfs/proc:ro
+      - /etc:/rootfs/etc:ro
+    environment:
+      HOST_PROC: /rootfs/proc
+      HOST_SYS: /rootfs/sys
+      HOST_ETC: /rootfs/etc
+    networks:
+      - monitoring
+    depends_on:
+      - influxdb
+    restart: unless-stopped
+
+  # Redis for real-time privacy budget tracking
+  redis-monitoring:
+    image: redis:7-alpine
+    container_name: privacy-finetuner-redis-monitoring
+    command: redis-server --appendonly yes
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis-monitoring-data:/data
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Node Exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:v1.6.0
+    container_name: privacy-finetuner-node-exporter
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    volumes:
+      - '/:/host:ro,rslave'
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # cAdvisor for container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: privacy-finetuner-cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /cgroup:/cgroup:ro
+    ports:
+      - "8081:8080"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Privacy metrics exporter (custom service)
+  privacy-metrics-exporter:
+    build:
+      context: ../
+      dockerfile: scripts/privacy-exporter.Dockerfile
+    container_name: privacy-finetuner-privacy-exporter
+    environment:
+      PRIVACY_DB_URL: postgresql://privacy_app:secure_app_password_change_in_production@postgres:5432/privacy_finetuner_dev
+      REDIS_URL: redis://redis-monitoring:6379/0
+      METRICS_PORT: 8080
+    ports:
+      - "9200:8080"  # Different port mapping
+    networks:
+      - monitoring
+    depends_on:
+      - redis-monitoring
+    restart: unless-stopped
+
+networks:
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  alertmanager-data:
+    driver: local
+  loki-data:
+    driver: local
+  jaeger-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
+  influxdb-data:
+    driver: local
+  influxdb-config:
+    driver: local
+  redis-monitoring-data:
+    driver: local

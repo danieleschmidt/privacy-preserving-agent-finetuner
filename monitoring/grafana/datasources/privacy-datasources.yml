@@ -1,0 +1,175 @@
+# Grafana datasource configuration for Privacy-Preserving Agent Fine-Tuner
+# Defines connections to monitoring and privacy tracking systems
+
+apiVersion: 1
+
+datasources:
+  # Main Prometheus instance for system metrics
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    orgId: 1
+    url: http://prometheus:9090
+    basicAuth: false
+    isDefault: true
+    version: 1
+    editable: true
+    jsonData:
+      httpMethod: POST
+      queryTimeout: 60s
+      timeInterval: 15s
+    secureJsonData: {}
+
+  # Privacy metrics database
+  - name: Privacy-PostgreSQL
+    type: postgres
+    access: proxy
+    orgId: 1
+    url: postgres:5432
+    database: privacy_finetuner_dev
+    user: privacy_app
+    basicAuth: false
+    version: 1
+    editable: true
+    jsonData:
+      sslmode: prefer
+      maxOpenConns: 10
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    secureJsonData:
+      password: secure_app_password_change_in_production
+
+  # Loki for log aggregation
+  - name: Loki
+    type: loki
+    access: proxy
+    orgId: 1
+    url: http://loki:3100
+    basicAuth: false
+    version: 1
+    editable: true
+    jsonData:
+      maxLines: 1000
+      timeout: 60s
+      derivedFields:
+        - datasourceUid: jaeger
+          matcherRegex: "trace_id=(\\w+)"
+          name: TraceID
+          url: "$${__value.raw}"
+
+  # Jaeger for distributed tracing
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    orgId: 1
+    url: http://jaeger:16686
+    basicAuth: false
+    version: 1
+    editable: true
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki
+        tags: ['job', 'instance', 'pod', 'namespace']
+        mappedTags: [{ key: 'service.name', value: 'service' }]
+        mapTagNamesEnabled: false
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: false
+        filterBySpanID: false
+
+  # ElasticSearch for privacy audit logs
+  - name: Privacy-Audit-Logs
+    type: elasticsearch
+    access: proxy
+    orgId: 1
+    url: http://elasticsearch:9200
+    database: "privacy-audit-*"
+    basicAuth: false
+    version: 1
+    editable: true
+    jsonData:
+      interval: Daily
+      timeField: "@timestamp"
+      esVersion: "8.0.0"
+      includeFrozen: false
+      logMessageField: message
+      logLevelField: level
+      maxConcurrentShardRequests: 5
+
+  # InfluxDB for high-frequency privacy metrics
+  - name: Privacy-Metrics-InfluxDB
+    type: influxdb
+    access: proxy
+    orgId: 1
+    url: http://influxdb:8086
+    database: privacy_metrics
+    user: privacy_reader
+    basicAuth: false
+    version: 1
+    editable: true
+    jsonData:
+      timeInterval: "10s"
+      httpMode: GET
+      httpHeaderName1: "Authorization"
+    secureJsonData:
+      password: influx_reader_password
+      httpHeaderValue1: "Token YOUR_INFLUXDB_TOKEN"
+
+  # Redis for real-time privacy budget tracking
+  - name: Privacy-Budget-Redis
+    type: redis-datasource
+    access: proxy
+    orgId: 1
+    url: redis:6379
+    basicAuth: false
+    version: 1
+    editable: true
+    jsonData:
+      client: standalone
+      poolSize: 5
+      timeout: 10
+      pingInterval: 0
+      pipelineWindow: 0
+    secureJsonData:
+      password: dev_redis_password
+
+  # CloudWatch for AWS monitoring (if deployed on AWS)
+  - name: CloudWatch
+    type: cloudwatch
+    access: proxy
+    orgId: 1
+    basicAuth: false
+    version: 1
+    editable: true
+    jsonData:
+      authType: credentials
+      defaultRegion: us-east-1
+      customMetricsNamespaces: "Privacy/Finetuner,AWS/ECS,AWS/EC2"
+      assumeRoleArn: ""
+    secureJsonData:
+      accessKey: YOUR_AWS_ACCESS_KEY
+      secretKey: YOUR_AWS_SECRET_KEY
+
+  # TestData datasource for development
+  - name: TestData
+    type: testdata
+    access: proxy
+    orgId: 1
+    basicAuth: false
+    version: 1
+    editable: true
+    isDefault: false
+    jsonData:
+      # Used for testing privacy dashboards with synthetic data
+
+  # Mixed datasource for combining queries
+  - name: Mixed
+    type: datasource
+    access: proxy
+    orgId: 1
+    basicAuth: false
+    version: 1
+    editable: false
+    isDefault: false

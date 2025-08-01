@@ -1,0 +1,191 @@
+version: '3.8'
+
+services:
+  privacy-finetuner-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        PYTHON_VERSION: 3.11
+        CUDA_VERSION: 11.8
+    container_name: privacy-finetuner-dev
+    volumes:
+      - .:/workspace:cached
+      - privacy-finetuner-models:/workspace/models
+      - privacy-finetuner-data:/workspace/data
+      - privacy-finetuner-cache:/home/vscode/.cache
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - ENVIRONMENT=development
+      - PYTHONPATH=/workspace
+      - PRIVACY_FINETUNER_DEV=true
+      - CUDA_VISIBLE_DEVICES=0
+      - TORCH_HOME=/workspace/models/.torch
+      - TRANSFORMERS_CACHE=/workspace/models/.cache
+      - HF_HOME=/workspace/models/.cache/huggingface
+    ports:
+      - "8080:8080"   # API server
+      - "3000:3000"   # Frontend dev server
+      - "9090:9090"   # Prometheus metrics
+      - "8888:8888"   # Jupyter notebooks
+      - "6006:6006"   # TensorBoard
+      - "4040:4040"   # Spark UI
+    depends_on:
+      - postgres-dev
+      - redis-dev
+      - prometheus-dev
+    networks:
+      - privacy-dev-network
+    command: >
+      bash -c "
+        sleep 10 &&
+        python -m privacy_finetuner.api.server --host 0.0.0.0 --port 8080 --reload
+      "
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: privacy-finetuner-postgres-dev
+    environment:
+      POSTGRES_DB: privacy_finetuner_dev
+      POSTGRES_USER: privacy_dev
+      POSTGRES_PASSWORD: dev_password_change_in_production
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - privacy-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U privacy_dev -d privacy_finetuner_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-dev:
+    image: redis:7-alpine
+    container_name: privacy-finetuner-redis-dev
+    command: redis-server --appendonly yes --requirepass dev_redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - privacy-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: privacy-finetuner-prometheus-dev
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-dev-data:/prometheus
+    networks:
+      - privacy-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana-dev:
+    image: grafana/grafana:latest
+    container_name: privacy-finetuner-grafana-dev
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: dev_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-dev-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - privacy-dev-network
+    depends_on:
+      - prometheus-dev
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  jupyter-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyter
+    container_name: privacy-finetuner-jupyter-dev
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      JUPYTER_TOKEN: "dev-token-change-in-production"
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/workspace:cached
+      - privacy-finetuner-models:/workspace/models
+      - jupyter-dev-data:/home/jovyan/.jupyter
+    networks:
+      - privacy-dev-network
+    command: >
+      bash -c "
+        pip install -e /workspace &&
+        start-notebook.sh --NotebookApp.token='dev-token-change-in-production' --NotebookApp.notebook_dir='/workspace/notebooks'
+      "
+
+  mailhog-dev:
+    image: mailhog/mailhog:latest
+    container_name: privacy-finetuner-mailhog-dev
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - privacy-dev-network
+
+networks:
+  privacy-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  privacy-finetuner-models:
+    driver: local
+  privacy-finetuner-data:
+    driver: local
+  privacy-finetuner-cache:
+    driver: local
+  postgres-dev-data:
+    driver: local
+  redis-dev-data:
+    driver: local
+  prometheus-dev-data:
+    driver: local
+  grafana-dev-data:
+    driver: local
+  jupyter-dev-data:
+    driver: local

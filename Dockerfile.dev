@@ -1,0 +1,220 @@
+# Development Dockerfile for Privacy-Preserving Agent Fine-Tuner
+# Optimized for development with hot reload, debugging, and comprehensive tooling
+
+ARG PYTHON_VERSION=3.11
+ARG CUDA_VERSION=11.8
+
+# Use NVIDIA CUDA base image for GPU support
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu22.04
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VENV_IN_PROJECT=0 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    # Build essentials
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    cmake \
+    pkg-config \
+    # Python and development tools
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python3-pip \
+    python3-venv \
+    # System utilities
+    curl \
+    wget \
+    git \
+    vim \
+    nano \
+    htop \
+    tree \
+    jq \
+    unzip \
+    zip \
+    # Networking and security
+    openssh-client \
+    gnupg \
+    ca-certificates \
+    software-properties-common \
+    apt-transport-https \
+    # Development utilities
+    tmux \
+    screen \
+    less \
+    file \
+    strace \
+    lsof \
+    # Graphics and visualization
+    graphviz \
+    # Database clients
+    postgresql-client \
+    redis-tools \
+    # Cleanup
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/*
+
+# Create non-root user for development
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && apt-get update \
+    && apt-get install -y sudo \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch to non-root user
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
+# Install Python package manager
+RUN curl -sSL https://install.python-poetry.org | python3 - \
+    && echo 'export PATH="/home/'$USERNAME'/.local/bin:$PATH"' >> ~/.bashrc
+
+ENV PATH="/home/$USERNAME/.local/bin:$PATH"
+
+# Configure Poetry
+RUN poetry config virtualenvs.create false \
+    && poetry config virtualenvs.in-project false \
+    && poetry config cache-dir /tmp/poetry_cache
+
+# Install Node.js for frontend development and tooling
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - \
+    && sudo apt-get install -y nodejs
+
+# Install global Python development tools
+RUN pip install --user --upgrade \
+    pip \
+    setuptools \
+    wheel \
+    # Development tools
+    black \
+    isort \
+    ruff \
+    mypy \
+    bandit \
+    safety \
+    # Testing tools
+    pytest \
+    pytest-cov \
+    pytest-xdist \
+    pytest-mock \
+    pytest-asyncio \
+    # Jupyter and notebooks
+    jupyter \
+    jupyterlab \
+    ipykernel \
+    # Debugging tools
+    ipdb \
+    pdbpp \
+    # Performance profiling
+    py-spy \
+    memray \
+    # Documentation tools
+    sphinx \
+    sphinx-rtd-theme \
+    # Monitoring and observability
+    prometheus-client \
+    opentelemetry-api \
+    opentelemetry-sdk
+
+# Install privacy-specific development tools
+RUN pip install --user --upgrade \
+    # Differential privacy
+    opacus \
+    # Privacy analysis
+    tensorflow-privacy \
+    # Federated learning
+    flower \
+    # Cryptography and security
+    cryptography \
+    # Hardware security
+    pysgx
+
+# Set up shell environment
+RUN echo 'export PYTHONPATH="/workspace:$PYTHONPATH"' >> ~/.bashrc \
+    && echo 'export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}' >> ~/.bashrc \
+    && echo 'alias ll="ls -alF"' >> ~/.bashrc \
+    && echo 'alias la="ls -A"' >> ~/.bashrc \
+    && echo 'alias l="ls -CF"' >> ~/.bashrc
+
+# Install Oh My Zsh for better shell experience
+RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.1.5/zsh-in-docker.sh)" -- \
+    -t robbyrussell \
+    -p git \
+    -p ssh-agent \
+    -p 'history-substring-search' \
+    -a 'bindkey "\$terminfo[kcuu1]" history-substring-search-up' \
+    -a 'bindkey "\$terminfo[kcud1]" history-substring-search-down'
+
+# Create workspace directory and set permissions
+USER root
+RUN mkdir -p /workspace \
+    && chown -R $USERNAME:$USERNAME /workspace \
+    && chmod -R 755 /workspace
+
+# Create directories for development
+RUN mkdir -p /workspace/{logs,tmp,notebooks,experiments,data,models} \
+    && chown -R $USERNAME:$USERNAME /workspace
+
+USER $USERNAME
+WORKDIR /workspace
+
+# Copy dependency files
+COPY --chown=$USERNAME:$USERNAME pyproject.toml poetry.lock* ./
+
+# Install Python dependencies
+RUN poetry install --with dev,test --no-root \
+    && rm -rf /tmp/poetry_cache
+
+# Install pre-commit for code quality
+RUN pip install --user pre-commit
+
+# Set up Jupyter kernel
+RUN python -m ipykernel install --user --name privacy-finetuner --display-name "Privacy Fine-tuner"
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+echo "🔒 Privacy-Preserving Agent Fine-Tuner Development Environment"\n\
+echo ""\n\
+echo "Available commands:"\n\
+echo "  python -m privacy_finetuner.cli --help"\n\
+echo "  pytest tests/ -v"\n\
+echo "  ruff check ."\n\
+echo "  mypy privacy_finetuner/"\n\
+echo "  jupyter lab --ip=0.0.0.0 --port=8888 --no-browser"\n\
+echo ""\n\
+echo "Documentation: /workspace/docs/"\n\
+echo "Examples: /workspace/notebooks/"\n\
+echo ""\n\
+exec "$@"' > /home/$USERNAME/entrypoint.sh \
+    && chmod +x /home/$USERNAME/entrypoint.sh
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import privacy_finetuner; print('OK')" || exit 1
+
+# Expose common development ports
+EXPOSE 8080 3000 8888 9090 6006
+
+# Set entrypoint
+ENTRYPOINT ["/home/vscode/entrypoint.sh"]
+
+# Default command for development
+CMD ["tail", "-f", "/dev/null"]
