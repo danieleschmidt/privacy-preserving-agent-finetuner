@@ -1,3 +1,246 @@
+# 🤖 Terragon Autonomous SDLC - GitHub Workflows Setup
+
+**IMPORTANT**: Due to GitHub App permissions, workflows must be created manually. This guide provides the exact files needed for autonomous SDLC operation.
+
+## Required Workflow Files
+
+Create these files in `.github/workflows/` directory:
+
+### 1. CI Pipeline (`ci.yml`)
+
+```yaml
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Daily security scan at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.7.1"
+  
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        installer-parallel: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --with dev
+      
+    - name: Run linting
+      run: |
+        poetry run ruff check .
+        poetry run black --check .
+        poetry run isort --check-only .
+        poetry run mypy privacy_finetuner/
+        
+    - name: Run tests
+      run: |
+        poetry run pytest tests/ -v --cov=privacy_finetuner --cov-report=xml --cov-report=term-missing
+        
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        
+    - name: Install dependencies
+      run: poetry install --with dev
+      
+    - name: Run Bandit security scan
+      run: |
+        poetry run bandit -r privacy_finetuner/ -f json -o bandit-report.json
+        poetry run bandit -r privacy_finetuner/ -f txt
+        
+    - name: Run Safety check
+      run: |
+        poetry run safety check --json --output safety-report.json
+        poetry run safety check
+        
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+          
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: python
+        queries: security-extended,security-and-quality
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      
+  privacy-compliance:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        
+    - name: Install dependencies
+      run: poetry install --with dev
+      
+    - name: Run privacy compliance checks
+      run: |
+        python scripts/privacy_compliance_check.py
+        
+    - name: Run advanced security scanner
+      run: |
+        python scripts/advanced_security_scanner.py
+        
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [test, security-scan, privacy-compliance]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: production
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+  terragon-value-discovery:
+    runs-on: ubuntu-latest
+    needs: [test, security-scan, privacy-compliance]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for analysis
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        
+    - name: Install dependencies
+      run: poetry install --with dev
+      
+    - name: Run Terragon Value Discovery
+      run: |
+        python .terragon/backlog-engine.py
+        
+    - name: Generate BACKLOG.md
+      run: |
+        python .terragon/generate-backlog-md.py
+        
+    - name: Commit backlog updates
+      if: success()
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .terragon/current-backlog.json BACKLOG.md || true
+        git diff --staged --quiet || git commit -m "🤖 Update autonomous value discovery backlog
+
+        🎯 Generated with Terragon Labs Autonomous SDLC
+        
+        Co-Authored-By: Claude <noreply@anthropic.com>"
+        git push || true
+```
+
+### 2. Terragon Autonomous SDLC (`terragon-autonomous.yml`)
+
+```yaml
 name: Terragon Autonomous SDLC
 
 on:
@@ -332,3 +575,36 @@ print('✅ Updated execution metrics')
         
         Co-Authored-By: Claude <noreply@anthropic.com>"
         git push origin main || true
+```
+
+## Setup Instructions
+
+1. **Create Workflow Directory**:
+   ```bash
+   mkdir -p .github/workflows
+   ```
+
+2. **Create the Workflow Files**:
+   - Copy the CI Pipeline content to `.github/workflows/ci.yml`
+   - Copy the Terragon Autonomous content to `.github/workflows/terragon-autonomous.yml`
+
+3. **Enable Workflows**:
+   - Commit and push these files to activate the autonomous system
+   - The CI pipeline will run on every push/PR
+   - The autonomous system will run hourly on the main branch
+
+4. **Permissions Required**:
+   - Actions: read/write (for workflow execution)
+   - Contents: write (for creating branches and PRs)
+   - Pull requests: write (for autonomous PR creation)
+
+## Expected Behavior
+
+Once active, the system will:
+- ✅ Run comprehensive CI on every push
+- ✅ Execute value discovery hourly  
+- ✅ Autonomously create PRs for high-value work
+- ✅ Update backlog and metrics automatically
+- ✅ Learn from execution outcomes
+
+The autonomous system is designed to operate safely with human oversight through PR reviews.

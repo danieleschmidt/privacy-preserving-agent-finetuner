@@ -287,10 +287,11 @@ graph TD
 ## 📞 Next Steps & Recommendations
 
 ### Immediate Actions (Next 24 hours)
-1. **Workflow Activation**: Merge to main branch to activate autonomous system
-2. **Monitoring Setup**: Configure Grafana dashboards for value tracking
-3. **Team Training**: Brief development team on autonomous system operations
-4. **Baseline Metrics**: Establish initial performance baselines
+1. **Workflow Setup**: Create GitHub Actions workflows using templates in `docs/workflows/TERRAGON_WORKFLOWS_SETUP.md`
+2. **Workflow Activation**: Merge workflows to main branch to activate autonomous system
+3. **Monitoring Setup**: Configure Grafana dashboards for value tracking
+4. **Team Training**: Brief development team on autonomous system operations
+5. **Baseline Metrics**: Establish initial performance baselines
 
 ### Short-term Optimization (Next 7 days)
 1. **Fine-tune Scoring**: Adjust weights based on initial execution results
@@ -318,7 +319,11 @@ The **Terragon Labs Autonomous SDLC system** successfully transforms this MATURI
 
 This represents a **revolutionary approach to software development lifecycle management**, where the repository continuously evolves to deliver maximum value while maintaining quality, security, and compliance standards.
 
-The system is now **operational and ready for autonomous execution** upon merge to the main branch.
+The system is now **operational and ready for autonomous execution** upon:
+1. Creating GitHub Actions workflows from templates in `docs/workflows/TERRAGON_WORKFLOWS_SETUP.md`
+2. Merging to the main branch
+
+**⚠️ IMPORTANT**: Due to GitHub App permissions, workflows must be manually created using the provided templates.
 
 ---
 
