@@ -1,0 +1,167 @@
+# Terragon Labs Autonomous SDLC Configuration
+# Repository: privacy-preserving-agent-finetuner
+# Classification: MATURING (50-75% SDLC Maturity)
+
+repository:
+  name: "privacy-preserving-agent-finetuner"
+  classification: "maturing"
+  maturity_score: 65
+  primary_language: "python"
+  framework: "fastapi"
+  
+# Adaptive scoring weights based on repository maturity
+scoring:
+  weights:
+    wsjf: 0.6          # Weighted Shortest Job First (high for maturing repos)
+    ice: 0.1           # Impact, Confidence, Ease (lower for established repos)
+    technicalDebt: 0.2 # Technical debt (important for mature codebases)
+    security: 0.1      # Security boost factor
+
+  # Value thresholds for autonomous execution
+  thresholds:
+    minScore: 15.0       # Minimum composite score to execute
+    maxRisk: 0.8         # Maximum risk threshold (0-1)
+    securityBoost: 2.0   # Multiplier for security issues
+    complianceBoost: 1.8 # Multiplier for compliance issues
+    
+  # Priority multipliers by category
+  category_multipliers:
+    security: 2.0
+    compliance: 1.8
+    performance: 1.5
+    technical_debt: 1.3
+    documentation: 0.8
+    dependency_update: 0.7
+
+# Discovery configuration for continuous value identification
+discovery:
+  enabled: true
+  schedule:
+    immediate_post_merge: true
+    hourly_security: true
+    daily_comprehensive: true
+    weekly_deep_analysis: true
+    monthly_strategic: true
+    
+  sources:
+    git_history:
+      enabled: true
+      keywords: ["TODO", "FIXME", "HACK", "XXX", "BUG", "DEPRECATED"]
+      commit_patterns: ["quick fix", "temporary", "workaround"]
+      
+    static_analysis:
+      enabled: true
+      tools:
+        - "ruff"
+        - "mypy" 
+        - "bandit"
+        - "safety"
+        - "semgrep"
+        
+    external_apis:
+      enabled: true
+      github_issues: true
+      vulnerability_databases: true
+      dependency_updates: true
+      
+    code_metrics:
+      enabled: true
+      complexity_threshold: 10
+      churn_analysis: true
+      hotspot_detection: true
+
+# Execution configuration
+execution:
+  max_concurrent_tasks: 1
+  require_tests_pass: true
+  require_linting_pass: true
+  create_feature_branches: true
+  auto_create_prs: true
+  
+  test_requirements:
+    min_coverage: 80
+    max_performance_regression: 5  # percent
+    
+  rollback_triggers:
+    - test_failure
+    - build_failure
+    - security_violation
+    - coverage_drop
+
+# Learning and adaptation
+learning:
+  enabled: true
+  track_accuracy: true
+  adjust_weights: true
+  confidence_learning: true
+  effort_estimation_improvement: true
+  
+  feedback_loop:
+    compare_predicted_vs_actual: true
+    update_scoring_model: true
+    calibrate_effort_estimates: true
+    learn_from_failures: true
+
+# Integration settings
+integrations:
+  github:  
+    enabled: true
+    create_issues: false  # Avoid spam
+    update_project_boards: true
+    assign_code_owners: true
+    
+  monitoring:
+    prometheus_metrics: true
+    grafana_dashboards: true
+    alert_on_failures: true
+    
+  notifications:
+    slack_webhook: null  # Set via environment
+    email_alerts: false
+    
+# Repository-specific settings for maturing codebase
+maturing_repo_config:
+  focus_areas:
+    - "advanced_testing"        # Mutation, contract, load testing
+    - "comprehensive_security"  # SBOM, SLSA, runtime security
+    - "operational_excellence"  # Monitoring, alerting, DR
+    - "developer_experience"    # IDE config, debugging setup
+    
+  quality_gates:
+    code_coverage_threshold: 85
+    security_scan_required: true
+    performance_benchmark_required: true
+    documentation_coverage: 75
+    
+  modernization_targets:
+    python_version: "3.11+"
+    dependency_freshness_days: 30
+    container_base_image_updates: "monthly"
+    security_patch_sla_hours: 24
+
+# Autonomous execution schedule
+schedule:
+  discovery_frequency: "hourly"
+  execution_frequency: "on_discovery"
+  reporting_frequency: "daily"
+  learning_frequency: "weekly"
+  
+# Compliance and governance  
+compliance:
+  frameworks:
+    - "GDPR"
+    - "HIPAA" 
+    - "SOC2"
+  
+  required_approvals:
+    security_changes: ["@terragon-labs/security-team"]
+    privacy_changes: ["@terragon-labs/privacy-team"]
+    infrastructure_changes: ["@terragon-labs/devops-team"]
+    
+# Value tracking
+metrics:
+  track_value_delivered: true
+  track_cycle_times: true
+  track_success_rates: true
+  track_debt_reduction: true
+  export_to_prometheus: true
