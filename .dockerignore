@@ -1,62 +1,70 @@
-# Git
+# Docker ignore file for privacy-preserving agent finetuner
+# Excludes unnecessary files from Docker build context
+
+# Version control
 .git
 .gitignore
-.github
-
-# Documentation
-README.md
-docs/
-*.md
+.gitattributes
 
 # Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 .Python
-build
-develop-eggs
-dist
-downloads
-eggs
-.eggs
-lib
-lib64
-parts
-sdist
-var
-wheels
-*.egg-info
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# Testing
-.tox
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
 .coverage
 .coverage.*
 .cache
 nosetests.xml
 coverage.xml
 *.cover
-.hypothesis
-.pytest_cache
-htmlcov
-.mypy_cache
-.ruff_cache
+*.py,cover
+.hypothesis/
+.pytest_cache/
 
-# Virtual environments
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environments
 .env
 .venv
-env
-venv
-ENV
-env.bak
-venv.bak
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# IDE
-.vscode
-.idea
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# IDEs
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
@@ -70,43 +78,82 @@ venv.bak
 ehthumbs.db
 Thumbs.db
 
-# Jupyter
-.ipynb_checkpoints
-
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Logs
+logs/
 *.log
 
-# Build artifacts
-target/
-Dockerfile*
-docker-compose*
-.dockerignore
-
-# Security
-.secrets.baseline
-bandit-report.json
-safety-report.json
-
-# Development
-.env.example
-.devcontainer
-scripts/dev_*
-tests/
-monitoring/
-examples/
-
-# Large files
-models/
+# Application-specific
 data/
-logs/
-*.model
+models/
+experiments/
+results/
+notebooks/.ipynb_checkpoints/
+
+# Security and sensitive files
+*.key
+*.pem
+*.crt
+*.p12
+secrets/
+.secrets/
+
+# Cache directories
+.cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+
+# Build artifacts
+build/
+dist/
+*.whl
+*.tar.gz
+
+# Large files and datasets
+*.csv
+*.parquet
+*.hdf5
+*.h5
+*.pkl
+*.pickle
+*.joblib
+
+# Model files (often large)
+*.pt
+*.pth
 *.bin
 *.safetensors
+*.onnx
 
-# Config files that shouldn't be in image
-config/local*
-config/dev*
-config/test*
+# Development and testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Documentation source
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+*.md
+
+# Configuration examples
+*.example
+*.sample
+
+# Monitoring
+monitoring/
+grafana/
+prometheus/
+EOF < /dev/null
