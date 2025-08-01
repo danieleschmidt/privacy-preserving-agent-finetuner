@@ -1,0 +1,311 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Privacy Budget Management",
+    "tags": ["privacy", "differential-privacy", "budget"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 30,
+    "version": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "session_id",
+          "type": "query",
+          "query": "SELECT DISTINCT session_id FROM privacy_audit.training_sessions WHERE status = 'active'",
+          "datasource": "Privacy-PostgreSQL",
+          "refresh": 1,
+          "includeAll": false,
+          "multi": false
+        },
+        {
+          "name": "user_id",
+          "type": "query", 
+          "query": "SELECT DISTINCT user_id FROM privacy_audit.training_sessions WHERE user_id IS NOT NULL",
+          "datasource": "Privacy-PostgreSQL",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Privacy Violations",
+          "datasource": "Privacy-PostgreSQL",
+          "enable": true,
+          "iconColor": "red",
+          "query": "SELECT timestamp as time, 'Privacy Violation' as title, event_details->>'description' as text FROM privacy_audit.compliance_events WHERE $__timeFilter(timestamp) AND severity = 'critical'"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Privacy Budget Overview",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "datasource": "Privacy-PostgreSQL",
+            "query": "SELECT consumed_epsilon, total_epsilon_budget, (consumed_epsilon/total_epsilon_budget)*100 as usage_percent FROM privacy_audit.training_sessions WHERE session_id = '$session_id'",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Epsilon Consumption Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "datasource": "Prometheus",
+            "query": "rate(privacy_budget_consumed{session_id=\"$session_id\"}[5m])",
+            "refId": "A",
+            "legendFormat": "Epsilon/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "eps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "barAlignment": 0,
+              "lineWidth": 1,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 0.01},
+                {"color": "red", "value": 0.1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Active Training Sessions",
+        "type": "table",
+        "gridPos": {"h": 9, "w": 24, "x": 0, "y": 8},
+        "targets": [
+          {
+            "datasource": "Privacy-PostgreSQL",
+            "query": "SELECT session_id, user_id, model_name, consumed_epsilon, total_epsilon_budget, ROUND((consumed_epsilon/total_epsilon_budget)*100, 2) as usage_percent, training_steps, started_at FROM privacy_audit.training_sessions WHERE status = 'active' ORDER BY started_at DESC",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "usage_percent"},
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "steps": [
+                      {"color": "green", "value": 0},
+                      {"color": "yellow", "value": 70},
+                      {"color": "red", "value": 90}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "title": "Daily Budget Consumption",
+        "type": "barchart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
+        "targets": [
+          {
+            "datasource": "Privacy-PostgreSQL",
+            "query": "SELECT date, total_epsilon_consumed, operations_count FROM privacy_metrics.daily_summary WHERE date >= CURRENT_DATE - INTERVAL '7 days' ORDER BY date",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "orientation": "horizontal",
+              "barWidth": 0.97,
+              "groupWidth": 0.7,
+              "showTooltipPercent": false
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Privacy Violations",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+        "targets": [
+          {
+            "datasource": "Privacy-Audit-Logs",
+            "query": "level:ERROR AND (privacy OR violation OR budget)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": false,
+          "prettifyLogMessage": false,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Differential Privacy Noise Scale",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 25},
+        "targets": [
+          {
+            "datasource": "Prometheus",
+            "query": "privacy_noise_multiplier{session_id=\"$session_id\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.5},
+                {"color": "green", "value": 1.0}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 7,
+        "title": "Gradient Clipping Rate",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 25},
+        "targets": [
+          {
+            "datasource": "Prometheus",
+            "query": "rate(gradient_clipped_total{session_id=\"$session_id\"}[5m]) / rate(gradient_computed_total{session_id=\"$session_id\"}[5m])",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 0.3},
+                {"color": "red", "value": 0.7}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Privacy Attack Risk Score",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 25},
+        "targets": [
+          {
+            "datasource": "Prometheus",
+            "query": "privacy_attack_risk_score{session_id=\"$session_id\"}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 0.5},
+                {"color": "red", "value": 0.8}
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}
