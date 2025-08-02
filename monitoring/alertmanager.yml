@@ -1,0 +1,228 @@
+# AlertManager configuration for Privacy-Preserving Agent Fine-Tuner
+# Handles alert routing, grouping, and notifications
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@privacy-finetuner.com'
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+# Route configuration
+route:
+  group_by: ['alertname', 'severity', 'component']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  routes:
+    # Critical privacy violations get immediate attention
+    - match:
+        severity: critical
+        category: privacy_violation
+      receiver: 'privacy-critical'
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+    
+    # Compliance violations need legal team notification
+    - match:
+        category: regulatory
+      receiver: 'compliance-team'
+      continue: true
+    
+    # Security alerts go to security team
+    - match:
+        category: security
+      receiver: 'security-team'
+      continue: true
+    
+    # Critical alerts get pager duty
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+      continue: true
+    
+    # Business hours vs after hours routing
+    - match_re:
+        severity: warning|info
+      receiver: 'business-hours'
+      active_time_intervals:
+        - business_hours
+    
+    - match_re:
+        severity: warning|info
+      receiver: 'after-hours'
+      active_time_intervals:
+        - after_hours
+
+# Time intervals for business hours routing
+time_intervals:
+  - name: business_hours
+    time_intervals:
+      - times:
+          - start_time: '09:00'
+            end_time: '17:00'
+        weekdays: ['monday:friday']
+        location: 'UTC'
+  
+  - name: after_hours
+    time_intervals:
+      - times:
+          - start_time: '17:01'
+            end_time: '08:59'
+        weekdays: ['monday:friday']
+        location: 'UTC'
+      - weekdays: ['saturday', 'sunday']
+        location: 'UTC'
+
+# Inhibit rules to prevent alert spam
+inhibit_rules:
+  # Inhibit warning alerts when critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+  
+  # Inhibit privacy budget warnings when budget is exhausted
+  - source_match:
+      alertname: 'PrivacyBudgetExhausted'
+    target_match:
+      alertname: 'PrivacyBudgetLow'
+    equal: ['session_id']
+
+# Notification receivers
+receivers:
+  - name: 'default'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#privacy-alerts'
+        title: 'Privacy-Preserving ML Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Component:* {{ .Labels.component }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'privacy-critical'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_PRIVACY_KEY}'
+        description: 'CRITICAL Privacy Violation'
+        details:
+          summary: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+          description: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+          component: '{{ range .Alerts }}{{ .Labels.component }}{{ end }}'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#privacy-critical'
+        color: 'danger'
+        title: '🚨 CRITICAL Privacy Violation'
+        text: |
+          <!channel> IMMEDIATE ATTENTION REQUIRED
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'privacy-team@privacy-finetuner.com'
+        subject: 'CRITICAL Privacy Violation - Immediate Action Required'
+        body: |
+          Critical privacy violation detected in Privacy-Preserving Agent Fine-Tuner.
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Time: {{ .StartsAt }}
+          Component: {{ .Labels.component }}
+          {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+          
+          Please investigate immediately and follow incident response procedures.
+
+  - name: 'compliance-team'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#compliance'
+        color: 'warning'
+        title: '⚖️ Compliance Alert'
+        text: |
+          {{ range .Alerts }}
+          *Compliance Issue:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Regulation:* {{ .Labels.category }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'compliance@privacy-finetuner.com'
+        subject: 'Compliance Alert - {{ range .Alerts }}{{ .Labels.category }}{{ end }}'
+        body: |
+          {{ range .Alerts }}
+          A compliance alert has been triggered.
+          
+          Issue: {{ .Annotations.summary }}
+          Details: {{ .Annotations.description }}
+          Time: {{ .StartsAt }}
+          Regulation: {{ .Labels.category }}
+          Component: {{ .Labels.component }}
+          {{ end }}
+
+  - name: 'security-team'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#security-alerts'
+        color: 'danger'
+        title: '🔒 Security Alert'
+        text: |
+          {{ range .Alerts }}
+          *Security Issue:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        details:
+          summary: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+          description: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+          severity: '{{ range .Alerts }}{{ .Labels.severity }}{{ end }}'
+          component: '{{ range .Alerts }}{{ .Labels.component }}{{ end }}'
+
+  - name: 'business-hours'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#privacy-alerts'
+        color: 'warning'
+        title: 'Privacy ML Alert (Business Hours)'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Component:* {{ .Labels.component }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'after-hours'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#privacy-alerts-after-hours'
+        color: 'warning'
+        title: 'Privacy ML Alert (After Hours)'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Component:* {{ .Labels.component }}
+          Note: This is an after-hours alert. Non-critical issues will be addressed during business hours.
+          {{ end }}
+        send_resolved: true
+
+# Templates for custom notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
