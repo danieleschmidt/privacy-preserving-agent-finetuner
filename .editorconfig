@@ -58,4 +58,3 @@ indent_size = 2
 
 [*.{xml,svg}]
 indent_size = 2
-EOF < /dev/null
