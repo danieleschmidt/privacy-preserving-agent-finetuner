@@ -1,0 +1,115 @@
+{
+  "project": {
+    "name": "Privacy-Preserving Agent Finetuner",
+    "version": "1.0.0",
+    "last_updated": "2025-08-02",
+    "repository": "danieleschmidt/privacy-preserving-agent-finetuner"
+  },
+  "metrics": {
+    "code_quality": {
+      "test_coverage_target": 85,
+      "code_quality_gate": "A",
+      "technical_debt_ratio_max": 5,
+      "maintainability_index_min": 70,
+      "cyclomatic_complexity_max": 10
+    },
+    "security": {
+      "vulnerability_scan_frequency": "daily",
+      "dependency_audit_frequency": "weekly",
+      "secret_scan_enabled": true,
+      "sbom_generation": true,
+      "security_score_target": 90
+    },
+    "privacy": {
+      "differential_privacy_budget_tracking": true,
+      "privacy_audit_frequency": "monthly",
+      "gdpr_compliance_checks": true,
+      "data_minimization_metrics": true,
+      "privacy_impact_assessments": true
+    },
+    "performance": {
+      "build_time_target_minutes": 5,
+      "test_execution_time_target_minutes": 10,
+      "deployment_time_target_minutes": 15,
+      "training_performance_baseline": {
+        "epochs_per_hour": 50,
+        "memory_usage_gb_max": 8,
+        "gpu_utilization_target": 80
+      }
+    },
+    "operational": {
+      "uptime_target_percentage": 99.5,
+      "response_time_p95_ms": 500,
+      "error_rate_max_percentage": 0.1,
+      "monitoring_alerts_enabled": true,
+      "backup_frequency": "daily"
+    },
+    "development": {
+      "commit_frequency_target_per_week": 10,
+      "pr_review_time_target_hours": 24,
+      "issue_resolution_time_target_days": 7,
+      "documentation_coverage_target": 90,
+      "api_documentation_automated": true
+    },
+    "compliance": {
+      "license_compliance_checks": true,
+      "open_source_audit_frequency": "quarterly",
+      "regulatory_compliance_frameworks": ["GDPR", "CCPA", "HIPAA"],
+      "audit_trail_retention_days": 365,
+      "compliance_score_target": 95
+    }
+  },
+  "tracking": {
+    "automated_collection": {
+      "github_actions_metrics": true,
+      "code_quality_tools": ["sonarqube", "codeclimate"],
+      "security_tools": ["snyk", "trivy", "codeql"],
+      "performance_monitoring": ["prometheus", "grafana"]
+    },
+    "reporting_frequency": {
+      "daily_builds": true,
+      "weekly_summary": true,
+      "monthly_trends": true,
+      "quarterly_review": true
+    },
+    "dashboard_urls": {
+      "grafana_dashboard": "http://localhost:3000/d/privacy-finetuner",
+      "prometheus_metrics": "http://localhost:9090",
+      "codecov_reports": "https://codecov.io/gh/danieleschmidt/privacy-preserving-agent-finetuner"
+    }
+  },
+  "thresholds": {
+    "alerts": {
+      "test_coverage_below": 80,
+      "build_failure_consecutive": 3,
+      "security_vulnerability_high": 1,
+      "performance_degradation_percent": 20,
+      "uptime_below_percent": 99
+    },
+    "blocking": {
+      "critical_security_vulnerabilities": 0,
+      "test_coverage_minimum": 75,
+      "code_quality_gate_fail": true,
+      "privacy_compliance_fail": true
+    }
+  },
+  "automation": {
+    "dependency_updates": {
+      "enabled": true,
+      "schedule": "weekly",
+      "auto_merge_patch": true,
+      "security_updates_immediate": true
+    },
+    "code_quality": {
+      "auto_formatting": true,
+      "lint_fixes": true,
+      "import_sorting": true,
+      "dead_code_removal": false
+    },
+    "documentation": {
+      "api_docs_generation": true,
+      "changelog_updates": true,
+      "readme_badge_updates": true
+    }
+  }
+}
