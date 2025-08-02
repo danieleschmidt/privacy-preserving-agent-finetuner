@@ -1,0 +1,256 @@
+# Promtail configuration for Privacy-Preserving Agent Fine-Tuner
+# Configured to collect logs while respecting privacy requirements
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+    # Privacy-focused configuration
+    headers:
+      X-Scope-OrgID: privacy-finetuner
+
+# Privacy-aware scrape configurations
+scrape_configs:
+  # Application logs with PII scrubbing
+  - job_name: privacy-finetuner-app
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: privacy-finetuner
+          component: application
+          __path__: /var/log/privacy-finetuner/*.log
+    
+    # Pipeline to scrub sensitive data
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            component: component
+            session_id: session_id
+            user_id: user_id
+      
+      # Scrub PII from log messages
+      - regex:
+          expression: '(?i)(email["\s]*[:=]["\s]*)([^\s"]+@[^\s"]+)'
+          replace: '${1}[REDACTED_EMAIL]'
+      
+      - regex:
+          expression: '(?i)(ssn["\s]*[:=]["\s]*)([0-9]{3}-[0-9]{2}-[0-9]{4})'
+          replace: '${1}[REDACTED_SSN]'
+      
+      - regex:
+          expression: '(?i)(credit[_\s]*card["\s]*[:=]["\s]*)([0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4})'
+          replace: '${1}[REDACTED_CARD]'
+      
+      - regex:
+          expression: '(?i)(phone["\s]*[:=]["\s]*)([0-9]{3}[\s.-]?[0-9]{3}[\s.-]?[0-9]{4})'
+          replace: '${1}[REDACTED_PHONE]'
+      
+      # Hash user IDs for privacy
+      - template:
+          source: user_id_hash
+          template: '{{ if .user_id }}{{ .user_id | Hash "sha256" | printf "%.8s" }}{{ end }}'
+      
+      # Set labels
+      - labels:
+          level: level
+          component: component
+          session_id: session_id
+          user_id_hash: user_id_hash
+      
+      # Format timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # Output clean log entry
+      - output:
+          source: message
+
+  # Privacy engine specific logs
+  - job_name: privacy-engine
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: privacy-engine
+          component: privacy
+          __path__: /var/log/privacy-finetuner/privacy-*.log
+    
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            epsilon: epsilon
+            delta: delta
+            budget_consumed: budget_consumed
+            budget_remaining: budget_remaining
+      
+      # Privacy budget monitoring
+      - metric:
+          privacy_budget_consumed:
+            type: Gauge
+            description: "Current privacy budget consumed"
+            source: budget_consumed
+            config:
+              value: '{{ .budget_consumed }}'
+              action: set
+      
+      - metric:
+          privacy_budget_remaining:
+            type: Gauge
+            description: "Remaining privacy budget"
+            source: budget_remaining
+            config:
+              value: '{{ .budget_remaining }}'
+              action: set
+      
+      - labels:
+          level: level
+          component: component
+      
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      - output:
+          source: message
+
+  # System logs with filtering
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          component: infrastructure
+          __path__: /var/log/syslog
+    
+    pipeline_stages:
+      # Filter out noisy messages
+      - match:
+          selector: '{job="system"}'
+          stages:
+            - regex:
+                expression: '.*privacy-finetuner.*'
+            - output:
+                source: message
+      
+      - labels:
+          component: system
+
+  # Docker container logs
+  - job_name: docker-containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          component: container
+          __path__: /var/lib/docker/containers/*/*-json.log
+    
+    pipeline_stages:
+      # Parse Docker JSON logs
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+      
+      # Filter by container names
+      - regex:
+          expression: '.*/(?P<container_name>[^/]+)-json.log'
+          source: filename
+      
+      # Only collect privacy-finetuner related containers
+      - match:
+          selector: '{container_name=~".*privacy.*"}'
+          stages:
+            - labels:
+                container_name: container_name
+                stream: stream
+            
+            - timestamp:
+                source: time
+                format: RFC3339Nano
+            
+            - output:
+                source: output
+
+  # Audit logs with special handling
+  - job_name: audit-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: audit
+          component: security
+          __path__: /var/log/privacy-finetuner/audit/*.log
+    
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            event_type: event_type
+            user_id: user_id
+            action: action
+            resource: resource
+            outcome: outcome
+            ip_address: ip_address
+      
+      # Hash sensitive identifiers
+      - template:
+          source: user_hash
+          template: '{{ if .user_id }}{{ .user_id | Hash "sha256" | printf "%.8s" }}{{ end }}'
+      
+      - template:
+          source: ip_hash
+          template: '{{ if .ip_address }}{{ .ip_address | Hash "sha256" | printf "%.8s" }}{{ end }}'
+      
+      # Metrics for audit events
+      - metric:
+          audit_events_total:
+            type: Counter
+            description: "Total audit events"
+            config:
+              action: inc
+      
+      - labels:
+          event_type: event_type
+          action: action
+          outcome: outcome
+          user_hash: user_hash
+          ip_hash: ip_hash
+      
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      - output:
+          source: action
+
+# Additional configuration
+limits_config:
+  readline_rate: 10000
+  readline_burst: 20000
+
+# Target configuration
+target_config:
+  sync_period: 10s
