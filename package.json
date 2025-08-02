@@ -1,0 +1,113 @@
+{
+  "name": "privacy-preserving-agent-finetuner",
+  "version": "0.1.0",
+  "description": "Development tools and scripts for Privacy-Preserving Agent Fine-Tuner",
+  "scripts": {
+    "dev": "make setup-dev",
+    "build": "make build",
+    "test": "make test",
+    "test:unit": "make test-unit",
+    "test:integration": "make test-integration",
+    "test:privacy": "make test-privacy",
+    "lint": "make lint",
+    "format": "make format",
+    "security": "make security",
+    "privacy-check": "make privacy-check",
+    "clean": "make clean",
+    "docs": "make docs",
+    "serve-docs": "make serve-docs",
+    "docker:build": "make docker-build",
+    "docker:run": "make docker-run",
+    "docker:dev": "make docker-run-dev",
+    "compose:up": "make docker-compose-up",
+    "compose:down": "make docker-compose-down",
+    "monitor": "make monitor",
+    "check": "make check",
+    "ci": "make ci",
+    "release": "make release",
+    "status": "make status",
+    "audit": "make audit",
+    "update": "make update",
+    "help": "make help"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.0.0",
+    "@commitlint/config-conventional": "^18.0.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "@prettier/plugin-xml": "^3.0.0",
+    "prettier-plugin-toml": "^2.0.0"
+  },
+  "lint-staged": {
+    "*.{json,yaml,yml,md}": [
+      "prettier --write"
+    ],
+    "*.py": [
+      "black",
+      "isort",
+      "ruff --fix"
+    ]
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "type-enum": [
+        2,
+        "always",
+        [
+          "feat",
+          "fix",
+          "docs",
+          "style",
+          "refactor",
+          "test",
+          "chore",
+          "build",
+          "ci",
+          "perf",
+          "revert",
+          "privacy",
+          "security",
+          "compliance"
+        ]
+      ],
+      "scope-enum": [
+        2,
+        "always",
+        [
+          "core",
+          "api",
+          "cli",
+          "privacy",
+          "security",
+          "monitoring",
+          "docs",
+          "tests",
+          "build",
+          "deps"
+        ]
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "privacy",
+    "differential-privacy",
+    "machine-learning",
+    "llm",
+    "fine-tuning",
+    "security",
+    "compliance"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/terragon-labs/privacy-preserving-agent-finetuner.git"
+  }
+}
