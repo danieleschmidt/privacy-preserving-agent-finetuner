@@ -1,0 +1,101 @@
+{
+  "privacy_test_data": [
+    {
+      "text": "Sample text for differential privacy testing",
+      "label": "benign",
+      "privacy_level": "low"
+    },
+    {
+      "text": "This contains PII: John Smith, SSN 123-45-6789",
+      "label": "sensitive",
+      "privacy_level": "high"
+    },
+    {
+      "text": "Medical record: Patient exhibits symptoms of condition X",
+      "label": "medical",
+      "privacy_level": "high"
+    },
+    {
+      "text": "Financial data: Account 987654321 has balance $5000",
+      "label": "financial",
+      "privacy_level": "high"
+    },
+    {
+      "text": "Generic conversation about weather and sports",
+      "label": "benign",
+      "privacy_level": "low"
+    }
+  ],
+  
+  "federated_test_data": {
+    "client_1": [
+      {"text": "Client 1 training data sample 1"},
+      {"text": "Client 1 training data sample 2"},
+      {"text": "Client 1 training data sample 3"}
+    ],
+    "client_2": [
+      {"text": "Client 2 training data sample 1"},
+      {"text": "Client 2 training data sample 2"},
+      {"text": "Client 2 training data sample 3"}
+    ],
+    "client_3": [
+      {"text": "Client 3 training data sample 1"},
+      {"text": "Client 3 training data sample 2"},
+      {"text": "Client 3 training data sample 3"}
+    ]
+  },
+  
+  "attack_test_data": {
+    "membership_inference": [
+      {"text": "Target text for membership inference attack", "in_training": true},
+      {"text": "Similar text not in training set", "in_training": false},
+      {"text": "Another training sample for MI testing", "in_training": true},
+      {"text": "Out-of-distribution sample", "in_training": false}
+    ],
+    
+    "model_inversion": [
+      {"text": "Sensitive template: [PERSON] works at [COMPANY]"},
+      {"text": "Financial template: Account [ACCOUNT] has balance [AMOUNT]"},
+      {"text": "Medical template: Patient [ID] has condition [CONDITION]"}
+    ],
+    
+    "property_inference": [
+      {"text": "Sample from demographic group A"},
+      {"text": "Sample from demographic group B"},
+      {"text": "Sample with specific linguistic property"},
+      {"text": "Neutral sample without specific properties"}
+    ]
+  },
+  
+  "compliance_test_data": {
+    "gdpr_samples": [
+      {"text": "EU citizen personal data", "jurisdiction": "EU", "regulation": "GDPR"},
+      {"text": "Data processing consent record", "jurisdiction": "EU", "regulation": "GDPR"}
+    ],
+    
+    "hipaa_samples": [
+      {"text": "Protected health information sample", "jurisdiction": "US", "regulation": "HIPAA"},
+      {"text": "Medical treatment record", "jurisdiction": "US", "regulation": "HIPAA"}
+    ],
+    
+    "ccpa_samples": [
+      {"text": "California consumer personal information", "jurisdiction": "CA", "regulation": "CCPA"},
+      {"text": "Personal data sale opt-out record", "jurisdiction": "CA", "regulation": "CCPA"}
+    ]
+  },
+  
+  "performance_benchmarks": {
+    "small_dataset": {
+      "size": 100,
+      "description": "Small dataset for quick testing"
+    },
+    "medium_dataset": {
+      "size": 10000,
+      "description": "Medium dataset for performance testing"
+    },
+    "large_dataset": {
+      "size": 100000,
+      "description": "Large dataset for scalability testing"
+    }
+  }
+}

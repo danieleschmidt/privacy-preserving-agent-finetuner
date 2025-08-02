@@ -1,0 +1,160 @@
+# Test configuration templates for different scenarios
+
+privacy_configs:
+  minimal:
+    epsilon: 10.0
+    delta: 1e-3
+    max_grad_norm: 1.0
+    noise_multiplier: 0.1
+    accounting_mode: "rdp"
+    description: "Minimal privacy for testing"
+  
+  moderate:
+    epsilon: 1.0
+    delta: 1e-5
+    max_grad_norm: 1.0
+    noise_multiplier: 0.5
+    accounting_mode: "rdp"
+    description: "Moderate privacy for development"
+  
+  strict:
+    epsilon: 0.1
+    delta: 1e-6
+    max_grad_norm: 0.5
+    noise_multiplier: 2.0
+    accounting_mode: "gdp"
+    description: "Strict privacy for production"
+
+model_configs:
+  tiny:
+    model_name: "microsoft/DialoGPT-small"
+    max_length: 128
+    batch_size: 2
+    learning_rate: 5e-5
+    description: "Tiny model for unit tests"
+  
+  small:
+    model_name: "microsoft/DialoGPT-medium"
+    max_length: 256
+    batch_size: 4
+    learning_rate: 3e-5
+    description: "Small model for integration tests"
+  
+  medium:
+    model_name: "microsoft/DialoGPT-large"
+    max_length: 512
+    batch_size: 8
+    learning_rate: 1e-5
+    description: "Medium model for performance tests"
+
+federated_configs:
+  local_test:
+    min_clients: 2
+    max_clients: 5
+    rounds: 3
+    aggregation_method: "fedavg"
+    local_epochs: 2
+    description: "Local testing setup"
+  
+  distributed_test:
+    min_clients: 5
+    max_clients: 20
+    rounds: 10
+    aggregation_method: "secure_sum"
+    local_epochs: 5
+    description: "Distributed testing setup"
+
+security_configs:
+  attack_simulation:
+    enable_membership_inference: true
+    enable_model_inversion: true
+    enable_property_inference: true
+    attack_budget: 1000
+    description: "Security attack simulation"
+  
+  defense_testing:
+    enable_gradient_clipping: true
+    enable_noise_addition: true
+    enable_secure_aggregation: true
+    defense_strength: "high"
+    description: "Defense mechanism testing"
+
+compliance_configs:
+  gdpr_test:
+    jurisdiction: "EU"
+    regulation: "GDPR"
+    privacy_level: "strict"
+    audit_logging: true
+    right_to_be_forgotten: true
+    description: "GDPR compliance testing"
+  
+  hipaa_test:
+    jurisdiction: "US"
+    regulation: "HIPAA"
+    privacy_level: "strict"
+    encryption_required: true
+    access_logging: true
+    description: "HIPAA compliance testing"
+  
+  ccpa_test:
+    jurisdiction: "CA"
+    regulation: "CCPA"
+    privacy_level: "moderate"
+    data_portability: true
+    opt_out_mechanism: true
+    description: "CCPA compliance testing"
+
+performance_configs:
+  speed_test:
+    max_duration_seconds: 60
+    target_throughput: 1000
+    memory_limit_mb: 2048
+    description: "Speed performance testing"
+  
+  scalability_test:
+    max_clients: 1000
+    max_dataset_size: 1000000
+    max_model_parameters: 1000000000
+    description: "Scalability testing"
+  
+  accuracy_test:
+    baseline_accuracy: 0.85
+    min_acceptable_accuracy: 0.80
+    privacy_budget_range: [0.1, 10.0]
+    description: "Privacy-accuracy trade-off testing"
+
+hardware_configs:
+  cpu_only:
+    device: "cpu"
+    num_workers: 4
+    memory_limit: "8GB"
+    description: "CPU-only testing"
+  
+  single_gpu:
+    device: "cuda:0"
+    num_workers: 8
+    memory_limit: "16GB"
+    gpu_memory_fraction: 0.8
+    description: "Single GPU testing"
+  
+  multi_gpu:
+    device: "cuda"
+    num_gpus: 2
+    num_workers: 16
+    memory_limit: "32GB"
+    gpu_memory_fraction: 0.9
+    description: "Multi-GPU testing"
+
+integration_configs:
+  local_services:
+    redis_url: "redis://localhost:6379/15"
+    database_url: "sqlite:///:memory:"
+    prometheus_port: 9091
+    description: "Local services integration"
+  
+  cloud_services:
+    use_aws_nitro: false
+    use_azure_confidential: false
+    use_gcp_confidential: false
+    mock_cloud_services: true
+    description: "Cloud services integration (mocked)"
