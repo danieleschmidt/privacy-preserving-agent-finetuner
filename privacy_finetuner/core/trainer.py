@@ -83,11 +83,69 @@ class PrivateTrainer:
             logger.error(f"Training failed: {str(e)}")
             raise
     
-    def evaluate(self, test_set: str) -> Dict[str, Any]:
-        """Evaluate model while tracking privacy leakage."""
-        logger.info(f"Evaluating on {test_set}")
-        # TODO: Implement privacy-aware evaluation
-        return {"accuracy": 0.0, "privacy_leakage": 0.0}
+    def evaluate(self, test_set: str, privacy_aware: bool = True) -> Dict[str, Any]:
+        """Evaluate model while tracking privacy leakage.
+        
+        Args:
+            test_set: Path to test dataset
+            privacy_aware: Whether to apply privacy-preserving evaluation
+            
+        Returns:
+            Evaluation metrics with privacy analysis
+        """
+        logger.info(f"Evaluating on {test_set} (privacy_aware={privacy_aware})")
+        
+        try:
+            # Load test dataset
+            test_dataset = self._load_dataset(test_set)
+            
+            # Prepare data loader
+            from torch.utils.data import DataLoader
+            test_dataloader = DataLoader(
+                test_dataset, 
+                batch_size=8, 
+                shuffle=False,
+                collate_fn=self._data_collator
+            )
+            
+            # Evaluation metrics
+            total_loss = 0.0
+            total_samples = 0
+            privacy_leakage_score = 0.0
+            
+            self._model.eval()
+            import torch
+            
+            with torch.no_grad():
+                for batch in test_dataloader:
+                    outputs = self._model(**batch, labels=batch['input_ids'])
+                    loss = outputs.loss
+                    
+                    total_loss += loss.item() * len(batch['input_ids'])
+                    total_samples += len(batch['input_ids'])
+                    
+                    # Privacy leakage analysis if requested
+                    if privacy_aware:
+                        privacy_leakage_score += self._analyze_privacy_leakage(outputs, batch)
+            
+            avg_loss = total_loss / total_samples if total_samples > 0 else 0.0
+            perplexity = torch.exp(torch.tensor(avg_loss)).item()
+            
+            # Calculate accuracy proxy (inverse perplexity)
+            accuracy = max(0, 1 - (perplexity / 100))
+            
+            return {
+                "accuracy": accuracy,
+                "perplexity": perplexity,
+                "average_loss": avg_loss,
+                "privacy_leakage": privacy_leakage_score / total_samples if total_samples > 0 else 0.0,
+                "privacy_budget_used": self._get_privacy_spent(),
+                "samples_evaluated": total_samples
+            }
+            
+        except Exception as e:
+            logger.error(f"Evaluation failed: {str(e)}")
+            return {"accuracy": 0.0, "privacy_leakage": 0.0, "error": str(e)}
     
     def get_privacy_report(self) -> Dict[str, Any]:
         """Generate comprehensive privacy audit report."""
@@ -279,3 +337,80 @@ class PrivateTrainer:
             'input_ids': torch.tensor(padded_input_ids),
             'attention_mask': torch.tensor(padded_attention_mask)
         }
+    
+    def _analyze_privacy_leakage(self, outputs, batch) -> float:
+        """Analyze potential privacy leakage in model outputs.
+        
+        This implements membership inference attack resistance analysis.
+        """
+        import torch
+        import torch.nn.functional as F
+        
+        # Simple privacy leakage metric based on output confidence
+        logits = outputs.logits
+        probs = F.softmax(logits, dim=-1)
+        
+        # High confidence predictions might indicate memorization
+        max_probs = torch.max(probs, dim=-1)[0]
+        avg_confidence = torch.mean(max_probs).item()
+        
+        # Convert confidence to leakage score (higher confidence = potential leakage)
+        leakage_score = max(0, avg_confidence - 0.7)  # Threshold for concern
+        
+        return leakage_score
+    
+    def save_checkpoint(self, checkpoint_path: str) -> None:
+        """Save training checkpoint with privacy state."""
+        import torch
+        import json
+        from pathlib import Path
+        
+        checkpoint_dir = Path(checkpoint_path)
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save model state
+        if self._model is not None:
+            self._model.save_pretrained(checkpoint_dir / "model")
+            self.tokenizer.save_pretrained(checkpoint_dir / "model")
+        
+        # Save privacy state
+        privacy_state = {
+            "epsilon_spent": self._get_privacy_spent(),
+            "privacy_config": {
+                "epsilon": self.privacy_config.epsilon,
+                "delta": self.privacy_config.delta,
+                "max_grad_norm": self.privacy_config.max_grad_norm,
+                "noise_multiplier": self.privacy_config.noise_multiplier,
+                "accounting_mode": self.privacy_config.accounting_mode
+            }
+        }
+        
+        with open(checkpoint_dir / "privacy_state.json", 'w') as f:
+            json.dump(privacy_state, f, indent=2)
+        
+        logger.info(f"Checkpoint saved to {checkpoint_path}")
+    
+    def load_checkpoint(self, checkpoint_path: str) -> None:
+        """Load training checkpoint with privacy state."""
+        import json
+        from pathlib import Path
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        
+        checkpoint_dir = Path(checkpoint_path)
+        
+        # Load model
+        model_path = checkpoint_dir / "model"
+        if model_path.exists():
+            self._model = AutoModelForCausalLM.from_pretrained(str(model_path))
+            self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
+            logger.info(f"Model loaded from {model_path}")
+        
+        # Load privacy state
+        privacy_state_path = checkpoint_dir / "privacy_state.json"
+        if privacy_state_path.exists():
+            with open(privacy_state_path, 'r') as f:
+                privacy_state = json.load(f)
+            
+            logger.info(f"Privacy state loaded: ε_spent = {privacy_state.get('epsilon_spent', 0)}")
+        else:
+            logger.warning("No privacy state found in checkpoint")

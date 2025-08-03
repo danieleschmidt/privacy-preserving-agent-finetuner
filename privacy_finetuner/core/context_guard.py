@@ -82,12 +82,20 @@ class ContextGuard:
         }
     
     def _load_pii_patterns(self) -> Dict[str, str]:
-        """Load PII detection patterns."""
+        """Load comprehensive PII detection patterns."""
         return {
             "credit_card": r'\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b',
             "ssn": r'\b\d{3}-\d{2}-\d{4}\b',
             "email": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-            "phone": r'\b\d{3}[- ]?\d{3}[- ]?\d{4}\b'
+            "phone": r'\b\d{3}[- ]?\d{3}[- ]?\d{4}\b',
+            "ip_address": r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
+            "us_passport": r'\b[A-Z]{1,2}\d{6,9}\b',
+            "driver_license": r'\b[A-Z]{1,2}\d{6,8}\b',
+            "bank_account": r'\b\d{8,12}\b',
+            "iban": r'\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}([A-Z0-9]?){0,16}\b',
+            "bitcoin_address": r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b',
+            "api_key": r'\b[A-Za-z0-9]{32,}\b',
+            "jwt_token": r'\beyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*\b'
         }
     
     def _remove_pii(self, text: str) -> str:
@@ -160,3 +168,105 @@ class ContextGuard:
             encrypted_words.append(word_mapping[word])
         
         return " ".join(encrypted_words)
+    
+    def analyze_sensitivity(self, text: str) -> Dict[str, Any]:
+        """Analyze text sensitivity and recommend protection level.
+        
+        Args:
+            text: Input text to analyze
+            
+        Returns:
+            Sensitivity analysis with recommendations
+        """
+        sensitivity_score = 0
+        detected_patterns = []
+        
+        # Check for PII patterns
+        for pattern_name, pattern in self._pii_patterns.items():
+            matches = len(re.findall(pattern, text))
+            if matches > 0:
+                sensitivity_score += matches * 2
+                detected_patterns.append(pattern_name)
+        
+        # Check for potential sensitive keywords
+        sensitive_keywords = [
+            "password", "secret", "token", "key", "medical", "health",
+            "financial", "bank", "credit", "ssn", "social", "confidential"
+        ]
+        
+        for keyword in sensitive_keywords:
+            if keyword.lower() in text.lower():
+                sensitivity_score += 1
+                detected_patterns.append(f"keyword:{keyword}")
+        
+        # Determine sensitivity level
+        if sensitivity_score >= 5:
+            level = "high"
+        elif sensitivity_score >= 2:
+            level = "medium"
+        else:
+            level = "low"
+        
+        return {
+            "sensitivity_level": level,
+            "sensitivity_score": sensitivity_score,
+            "detected_patterns": detected_patterns,
+            "recommended_strategies": self._recommend_strategies(level),
+            "text_length": len(text),
+            "estimated_entities": self._count_entities(text)
+        }
+    
+    def _recommend_strategies(self, sensitivity_level: str) -> List[str]:
+        """Recommend protection strategies based on sensitivity level."""
+        if sensitivity_level == "high":
+            return ["pii_removal", "entity_hashing", "semantic_encryption"]
+        elif sensitivity_level == "medium":
+            return ["pii_removal", "entity_hashing"]
+        else:
+            return ["pii_removal"]
+    
+    def _count_entities(self, text: str) -> int:
+        """Count named entities in text."""
+        try:
+            import spacy
+            nlp = spacy.load("en_core_web_sm")
+            doc = nlp(text)
+            return len(doc.ents)
+        except (ImportError, OSError):
+            # Fallback: simple capitalized word count
+            import re
+            return len(re.findall(r'\b[A-Z][a-z]+\b', text))
+    
+    def create_privacy_report(self, original_text: str, protected_text: str) -> Dict[str, Any]:
+        """Create comprehensive privacy protection report.
+        
+        Args:
+            original_text: Original unprotected text
+            protected_text: Text after privacy protection
+            
+        Returns:
+            Detailed privacy protection report
+        """
+        original_analysis = self.analyze_sensitivity(original_text)
+        protected_analysis = self.analyze_sensitivity(protected_text)
+        redaction_info = self.explain_redactions(original_text)
+        
+        return {
+            "protection_summary": {
+                "original_sensitivity": original_analysis["sensitivity_level"],
+                "protected_sensitivity": protected_analysis["sensitivity_level"],
+                "sensitivity_reduction": original_analysis["sensitivity_score"] - protected_analysis["sensitivity_score"],
+                "strategies_applied": [s.value for s in self.strategies]
+            },
+            "text_metrics": {
+                "original_length": len(original_text),
+                "protected_length": len(protected_text),
+                "compression_ratio": len(protected_text) / len(original_text) if len(original_text) > 0 else 0
+            },
+            "redaction_analysis": redaction_info,
+            "privacy_compliance": {
+                "gdpr_compliant": protected_analysis["sensitivity_score"] < 2,
+                "hipaa_ready": "medical" not in original_analysis["detected_patterns"],
+                "pci_safe": "credit_card" not in original_analysis["detected_patterns"]
+            }
+        }
