@@ -49,15 +49,14 @@ def test_config_dir() -> Path:
 @pytest.fixture
 def privacy_config():
     """Create a test privacy configuration."""
-    from privacy_finetuner.config.privacy import PrivacyConfig
+    from privacy_finetuner.core.privacy_config import PrivacyConfig
     
     return PrivacyConfig(
         epsilon=TEST_EPSILON,
         delta=TEST_DELTA,
         max_grad_norm=1.0,
         noise_multiplier=0.5,
-        accounting_mode="rdp",
-        secure_rng=True,
+        accounting_mode="rdp"
     )
 
 
@@ -153,10 +152,30 @@ def mock_redis():
 @pytest.fixture
 def mock_database():
     """Mock database session."""
-    with patch("privacy_finetuner.database.get_session") as mock:
+    with patch("privacy_finetuner.database.connection.get_db_session") as mock:
         session = MagicMock()
         mock.return_value = session
         yield session
+
+
+@pytest.fixture
+def test_database():
+    """Create test database session."""
+    from privacy_finetuner.database.connection import DatabaseManager
+    from privacy_finetuner.database.models import Base
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    
+    # Create in-memory SQLite database
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    Base.metadata.create_all(engine)
+    
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = SessionLocal()
+    
+    yield session
+    
+    session.close()
 
 
 @pytest.fixture
