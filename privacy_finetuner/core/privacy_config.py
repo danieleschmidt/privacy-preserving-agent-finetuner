@@ -47,3 +47,28 @@ class PrivacyConfig:
             raise ValueError("Delta must be between 0 and 1")
         if self.max_grad_norm <= 0:
             raise ValueError("Max gradient norm must be positive")
+        if self.noise_multiplier < 0:
+            raise ValueError("Noise multiplier must be non-negative")
+        if self.accounting_mode not in ["rdp", "gdp"]:
+            raise ValueError("Accounting mode must be 'rdp' or 'gdp'")
+    
+    def get_effective_noise_scale(self, sample_rate: float) -> float:
+        """Calculate effective noise scale for given sample rate."""
+        return self.noise_multiplier * self.max_grad_norm * sample_rate
+    
+    def estimate_privacy_cost(self, steps: int, sample_rate: float) -> float:
+        """Estimate privacy cost for given training parameters."""
+        import math
+        
+        if self.accounting_mode == "rdp":
+            # Simplified RDP bound for Gaussian mechanism
+            sigma = self.noise_multiplier
+            q = sample_rate
+            alpha = 10  # Common RDP order
+            
+            rdp = (alpha * (alpha - 1) * q * q) / (2 * sigma * sigma)
+            epsilon = rdp * steps + math.log(1 / self.delta) / (alpha - 1)
+            return epsilon
+        else:
+            # Basic composition bound
+            return steps * sample_rate / self.noise_multiplier

@@ -99,10 +99,64 @@ class ContextGuard:
     
     def _hash_entities(self, text: str) -> str:
         """Replace entities with consistent hashes."""
-        # TODO: Implement entity recognition and hashing
-        return text
+        import hashlib
+        import spacy
+        
+        # Load spacy model for NER (in production, cache this)
+        try:
+            nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            logger.warning("spaCy model not found, skipping entity hashing")
+            return text
+        
+        doc = nlp(text)
+        protected_text = text
+        
+        # Replace entities with consistent hashes
+        for ent in reversed(doc.ents):  # Reverse to maintain positions
+            if ent.label_ in ["PERSON", "ORG", "GPE", "LOC"]:
+                # Create consistent hash for entity
+                entity_hash = hashlib.sha256(
+                    (ent.text + ent.label_).encode()
+                ).hexdigest()[:8]
+                
+                replacement = f"[{ent.label_}_{entity_hash}]"
+                protected_text = (
+                    protected_text[:ent.start_char] + 
+                    replacement + 
+                    protected_text[ent.end_char:]
+                )
+        
+        return protected_text
     
     def _semantic_encrypt(self, text: str, sensitivity_level: str) -> str:
         """Apply semantic encryption while preserving structure."""
-        # TODO: Implement semantic encryption
-        return text
+        import hashlib
+        from collections import defaultdict
+        
+        # Simple semantic encryption using word-level replacement
+        words = text.split()
+        word_mapping = defaultdict(str)
+        
+        # Sensitivity-based encryption strength
+        hash_length = {
+            "low": 4,
+            "medium": 6, 
+            "high": 8
+        }.get(sensitivity_level, 6)
+        
+        encrypted_words = []
+        for word in words:
+            # Skip common words for structure preservation
+            if word.lower() in ["the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for"]:
+                encrypted_words.append(word)
+                continue
+            
+            # Create consistent encryption for each unique word
+            if word not in word_mapping:
+                word_hash = hashlib.sha256(word.encode()).hexdigest()[:hash_length]
+                word_mapping[word] = f"ENC_{word_hash}"
+            
+            encrypted_words.append(word_mapping[word])
+        
+        return " ".join(encrypted_words)
