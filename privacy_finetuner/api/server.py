@@ -90,10 +90,33 @@ def create_app() -> FastAPI:
         return PrivacyReportResponse(**report)
     
     @app.post("/protect-context")
-    async def protect_context(text: str, sensitivity: str = "medium"):
+    async def protect_context(text: str, sensitivity: str = "medium", strategies: list = ["pii_removal"]):
         """Protect sensitive context using privacy guards."""
-        # TODO: Implement context protection endpoint
-        return {"protected_text": text, "redactions_applied": 0}
+        from ..core.context_guard import ContextGuard, RedactionStrategy
+        
+        try:
+            # Convert string strategies to enum
+            redaction_strategies = []
+            for strategy_name in strategies:
+                if hasattr(RedactionStrategy, strategy_name.upper()):
+                    redaction_strategies.append(getattr(RedactionStrategy, strategy_name.upper()))
+            
+            # Create context guard
+            guard = ContextGuard(redaction_strategies)
+            
+            # Apply protection
+            protected_text = guard.protect(text, sensitivity)
+            redaction_report = guard.explain_redactions(text)
+            
+            return {
+                "protected_text": protected_text,
+                "redaction_report": redaction_report,
+                "strategies_applied": strategies
+            }
+            
+        except Exception as e:
+            logger.error(f"Context protection failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
     
     return app
 

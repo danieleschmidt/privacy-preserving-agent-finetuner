@@ -135,5 +135,65 @@ def validate_config(
         raise typer.Exit(1)
 
 
+@app.command()
+def server(
+    host: str = typer.Option("0.0.0.0", help="Server host"),
+    port: int = typer.Option(8080, help="Server port"),
+    workers: int = typer.Option(1, help="Number of worker processes"),
+    reload: bool = typer.Option(False, help="Enable auto-reload for development"),
+):
+    """Start the FastAPI server for the privacy-preserving training API."""
+    import uvicorn
+    from .api.server import create_app
+    
+    console.print(f"🚀 Starting Privacy-Preserving Agent Finetuner API", style="bold green")
+    console.print(f"📡 Server: http://{host}:{port}")
+    console.print(f"📚 API Documentation: http://{host}:{port}/docs")
+    
+    app_instance = create_app()
+    
+    uvicorn.run(
+        app_instance,
+        host=host,
+        port=port,
+        workers=workers if not reload else 1,
+        reload=reload
+    )
+
+
+@app.command() 
+def estimate_cost(
+    epsilon: float = typer.Argument(..., help="Target epsilon budget"),
+    steps: int = typer.Option(1000, help="Number of training steps"),
+    sample_rate: float = typer.Option(0.01, help="Sample rate for training"),
+    noise_multiplier: float = typer.Option(0.5, help="Noise multiplier"),
+):
+    """Estimate privacy cost for given training parameters."""
+    privacy_config = PrivacyConfig(
+        epsilon=epsilon,
+        noise_multiplier=noise_multiplier
+    )
+    
+    estimated_cost = privacy_config.estimate_privacy_cost(steps, sample_rate)
+    
+    table = Table(title="Privacy Cost Estimation")
+    table.add_column("Parameter", style="cyan")
+    table.add_column("Value", style="magenta")
+    
+    table.add_row("Target Epsilon", str(epsilon))
+    table.add_row("Training Steps", str(steps))
+    table.add_row("Sample Rate", str(sample_rate))
+    table.add_row("Noise Multiplier", str(noise_multiplier))
+    table.add_row("Estimated Cost", f"{estimated_cost:.6f}")
+    table.add_row("Remaining Budget", f"{max(0, epsilon - estimated_cost):.6f}")
+    
+    console.print(table)
+    
+    if estimated_cost > epsilon:
+        console.print("⚠️  Warning: Estimated cost exceeds budget!", style="bold red")
+    else:
+        console.print("✅ Budget is sufficient for training", style="bold green")
+
+
 if __name__ == "__main__":
     app()
