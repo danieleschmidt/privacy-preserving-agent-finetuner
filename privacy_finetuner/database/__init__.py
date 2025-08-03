@@ -1,6 +1,6 @@
 """Database layer for privacy-preserving agent finetuner."""
 
-from .connection import DatabaseManager, get_database
+from .connection import DatabaseManager, get_database, get_db_session
 from .models import (
     Base,
     TrainingJob,
@@ -8,7 +8,8 @@ from .models import (
     Dataset,
     Model,
     User,
-    AuditLog
+    AuditLog,
+    TimestampMixin
 )
 from .repositories import (
     TrainingJobRepository,
@@ -16,12 +17,23 @@ from .repositories import (
     DatasetRepository,
     ModelRepository,
     UserRepository,
-    AuditLogRepository
+    AuditLogRepository,
+    BaseRepository
+)
+from .query_optimizer import QueryOptimizer, PrivacyQueryMixin, QueryMetrics
+from .advanced_operations import (
+    AdvancedPrivacyOperations,
+    PrivacyBudgetAnalysis,
+    ModelPerformanceMetrics
 )
 
 __all__ = [
+    # Connection management
     "DatabaseManager",
     "get_database",
+    "get_db_session",
+    
+    # Models
     "Base",
     "TrainingJob",
     "PrivacyBudgetEntry",
@@ -29,10 +41,24 @@ __all__ = [
     "Model",
     "User",
     "AuditLog",
+    "TimestampMixin",
+    
+    # Repositories
     "TrainingJobRepository",
     "PrivacyBudgetRepository",
     "DatasetRepository",
     "ModelRepository",
     "UserRepository",
     "AuditLogRepository",
+    "BaseRepository",
+    
+    # Query optimization
+    "QueryOptimizer",
+    "PrivacyQueryMixin",
+    "QueryMetrics",
+    
+    # Advanced operations
+    "AdvancedPrivacyOperations",
+    "PrivacyBudgetAnalysis",
+    "ModelPerformanceMetrics",
 ]
