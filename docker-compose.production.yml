@@ -1,0 +1,396 @@
+version: '3.8'
+
+# Production-ready Docker Compose configuration for Privacy-Preserving Agent Finetuner
+# Includes load balancing, monitoring, security, and high availability
+
+services:
+  # Main application services (multiple instances for HA)
+  privacy-finetuner-app-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        BUILD_ENV: production
+        INSTALL_DEV_DEPS: false
+        ENABLE_GPU: true
+        PRIVACY_LEVEL: high
+    container_name: privacy-finetuner-app-1
+    restart: unless-stopped
+    environment:
+      # Application configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      - WORKERS=4
+      - MAX_CONNECTIONS=1000
+      - WORKER_CLASS=uvicorn.workers.UvicornWorker
+      
+      # Privacy and security
+      - PRIVACY_LEVEL=high
+      - AUDIT_LOGGING=true
+      - SECURITY_MONITORING=true
+      - ENCRYPTION_AT_REST=true
+      - TLS_ENABLED=false  # Handled by load balancer
+      
+      # Database
+      - DATABASE_URL=postgresql://privacy_user:${POSTGRES_PASSWORD}@postgres:5432/privacy_finetuner
+      - DATABASE_POOL_SIZE=20
+      - DATABASE_MAX_OVERFLOW=30
+      
+      # Cache
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_MAX_CONNECTIONS=100
+      - CACHE_TTL=3600
+      
+      # Monitoring
+      - PROMETHEUS_METRICS=true
+      - PROMETHEUS_PORT=9090
+      - HEALTH_CHECK_ENABLED=true
+      - PERFORMANCE_PROFILING=true
+      
+      # Logging
+      - LOG_LEVEL=info
+      - ACCESS_LOG=true
+    volumes:
+      - app-logs-1:/var/log/privacy-finetuner
+      - app-data-1:/var/lib/privacy-finetuner
+      - ./models:/app/models:ro
+      - ./config:/app/config:ro
+    networks:
+      - privacy-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=1G
+      - /var/log/privacy-finetuner:noexec,nosuid,size=1G
+
+  privacy-finetuner-app-2:
+    extends: privacy-finetuner-app-1
+    container_name: privacy-finetuner-app-2
+    volumes:
+      - app-logs-2:/var/log/privacy-finetuner
+      - app-data-2:/var/lib/privacy-finetuner
+      - ./models:/app/models:ro
+      - ./config:/app/config:ro
+
+  # Load Balancer (HAProxy)
+  load-balancer:
+    image: haproxy:2.8-alpine
+    container_name: privacy-finetuner-lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8404:8404"  # HAProxy stats
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./certs:/etc/ssl/certs:ro
+      - haproxy-logs:/var/log/haproxy
+    networks:
+      - privacy-network
+    depends_on:
+      - privacy-finetuner-app-1
+      - privacy-finetuner-app-2
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8404/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100M
+      - /var/log/haproxy:noexec,nosuid,size=200M
+
+  # PostgreSQL Database with High Availability
+  postgres:
+    image: postgres:15-alpine
+    container_name: privacy-finetuner-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=privacy_finetuner
+      - POSTGRES_USER=privacy_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - postgres-logs:/var/log/postgresql
+    networks:
+      - privacy-network
+    ports:
+      - "127.0.0.1:5432:5432"  # Only accessible from localhost
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U privacy_user -d privacy_finetuner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    security_opt:
+      - no-new-privileges:true
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: privacy-finetuner-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis-data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis-logs:/var/log/redis
+    networks:
+      - privacy-network
+    ports:
+      - "127.0.0.1:6379:6379"  # Only accessible from localhost
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    security_opt:
+      - no-new-privileges:true
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: privacy-finetuner-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+      - prometheus-logs:/var/log/prometheus
+    networks:
+      - privacy-network
+    ports:
+      - "127.0.0.1:9090:9090"  # Only accessible from localhost
+    depends_on:
+      - privacy-finetuner-app-1
+      - privacy-finetuner-app-2
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: privacy-finetuner-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-logs:/var/log/grafana
+    networks:
+      - privacy-network
+    ports:
+      - "127.0.0.1:3000:3000"  # Only accessible from localhost
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+
+  # Log Management (Loki)
+  loki:
+    image: grafana/loki:latest
+    container_name: privacy-finetuner-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+      - loki-logs:/var/log/loki
+    networks:
+      - privacy-network
+    ports:
+      - "127.0.0.1:3100:3100"  # Only accessible from localhost
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+
+  # Log Collector (Promtail)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: privacy-finetuner-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - app-logs-1:/var/log/privacy-finetuner-1:ro
+      - app-logs-2:/var/log/privacy-finetuner-2:ro
+      - haproxy-logs:/var/log/haproxy:ro
+      - postgres-logs:/var/log/postgresql:ro
+    networks:
+      - privacy-network
+    depends_on:
+      - loki
+    security_opt:
+      - no-new-privileges:true
+
+  # Security Scanner (Trivy)
+  security-scanner:
+    image: aquasec/trivy:latest
+    container_name: privacy-finetuner-security
+    restart: "no"
+    command: >
+      sh -c "
+        trivy image --exit-code 0 --no-progress --format json --output /reports/image-scan.json privacy-finetuner-app-1 &&
+        trivy fs --exit-code 0 --no-progress --format json --output /reports/fs-scan.json /app &&
+        sleep 3600
+      "
+    volumes:
+      - security-reports:/reports
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - privacy-network
+    profiles:
+      - security
+    security_opt:
+      - no-new-privileges:true
+
+  # Backup Service
+  backup-service:
+    image: alpine:latest
+    container_name: privacy-finetuner-backup
+    restart: unless-stopped
+    command: >
+      sh -c "
+        apk add --no-cache postgresql-client &&
+        while true; do
+          pg_dump -h postgres -U privacy_user -d privacy_finetuner > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql &&
+          find /backups -name '*.sql' -mtime +7 -delete &&
+          sleep 86400
+        done
+      "
+    environment:
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - backup-data:/backups
+    networks:
+      - privacy-network
+    depends_on:
+      - postgres
+    profiles:
+      - backup
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  privacy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: privacy-bridge
+
+volumes:
+  # Application data
+  app-logs-1:
+    driver: local
+  app-logs-2:
+    driver: local
+  app-data-1:
+    driver: local
+  app-data-2:
+    driver: local
+  
+  # Database
+  postgres-data:
+    driver: local
+  postgres-logs:
+    driver: local
+  
+  # Cache
+  redis-data:
+    driver: local
+  redis-logs:
+    driver: local
+  
+  # Load balancer
+  haproxy-logs:
+    driver: local
+  
+  # Monitoring
+  prometheus-data:
+    driver: local
+  prometheus-logs:
+    driver: local
+  grafana-data:
+    driver: local
+  grafana-logs:
+    driver: local
+  loki-data:
+    driver: local
+  loki-logs:
+    driver: local
+  
+  # Security and backup
+  security-reports:
+    driver: local
+  backup-data:
+    driver: local

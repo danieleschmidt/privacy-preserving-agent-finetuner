@@ -3,8 +3,22 @@
 from typing import Dict, Any, Optional
 from pathlib import Path
 import logging
+from datetime import datetime
+from pathlib import Path
+import json
+import time
+from typing import Union
 
 from .privacy_config import PrivacyConfig
+from .quantum_optimizer import QuantumInspiredOptimizer
+from .adaptive_privacy_scheduler import AdaptivePrivacyScheduler
+from .robust_training import TrainingMonitor, SecurityMonitor, AuditLogger
+from .exceptions import (
+    PrivacyBudgetExhaustedException,
+    ModelTrainingException,
+    DataValidationException,
+    SecurityViolationException
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +48,24 @@ class PrivateTrainer:
         self.use_mcp_gateway = use_mcp_gateway
         self._privacy_accountant = None
         self._model = None
+        self._quantum_optimizer = None
+        self._adaptive_scheduler = None
         
         # Validate privacy configuration
         self.privacy_config.validate()
+        
+        # Setup security monitoring
+        self._security_monitor = SecurityMonitor()
+        self._audit_logger = AuditLogger()
+        
+        # Log initialization with audit trail
+        self._audit_logger.log_initialization({
+            "model_name": model_name,
+            "epsilon": privacy_config.epsilon,
+            "delta": privacy_config.delta,
+            "timestamp": datetime.now().isoformat(),
+            "user_context": self._get_user_context()
+        })
         
         logger.info(f"Initialized PrivateTrainer for {model_name}")
         logger.info(f"Privacy budget: ε={privacy_config.epsilon}, δ={privacy_config.delta}")
@@ -47,6 +76,9 @@ class PrivateTrainer:
         epochs: int = 3,
         batch_size: int = 8,
         learning_rate: float = 5e-5,
+        checkpoint_interval: int = 100,
+        early_stopping_patience: int = 5,
+        validation_split: float = 0.1,
         **kwargs
     ) -> Dict[str, Any]:
         """Train model with differential privacy guarantees.
@@ -65,22 +97,47 @@ class PrivateTrainer:
         logger.info(f"Training config: epochs={epochs}, batch_size={batch_size}, lr={learning_rate}")
         
         try:
-            # Initialize model and privacy components
+            # Validate inputs
+            self._validate_training_inputs(dataset, epochs, batch_size, learning_rate)
+            
+            # Initialize model and privacy components with robust error handling
             self._setup_model_and_privacy()
             
-            # Load and prepare dataset
-            train_dataset = self._load_dataset(dataset)
+            # Load and prepare dataset with validation
+            train_dataset, val_dataset = self._load_and_split_dataset(
+                dataset, validation_split
+            )
             
-            # Setup DP-SGD training loop
-            results = self._train_with_dp_sgd(
-                train_dataset, epochs, batch_size, learning_rate, **kwargs
+            # Setup monitoring and checkpointing
+            training_monitor = TrainingMonitor(
+                checkpoint_interval=checkpoint_interval,
+                early_stopping_patience=early_stopping_patience,
+                privacy_config=self.privacy_config
+            )
+            
+            # Setup DP-SGD training loop with robust error recovery
+            results = self._train_with_dp_sgd_robust(
+                train_dataset, val_dataset, epochs, batch_size, 
+                learning_rate, training_monitor, **kwargs
             )
             
             logger.info("Training completed successfully")
             return results
             
+        except PrivacyBudgetExhaustedException as e:
+            logger.error(f"Privacy budget exhausted: {str(e)}")
+            self._handle_privacy_budget_exhaustion()
+            raise
+        except ModelTrainingException as e:
+            logger.error(f"Model training failed: {str(e)}")
+            self._handle_training_failure(e)
+            raise
+        except DataValidationException as e:
+            logger.error(f"Data validation failed: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"Training failed: {str(e)}")
+            logger.error(f"Unexpected training failure: {str(e)}", exc_info=True)
+            self._handle_unexpected_failure(e)
             raise
     
     def evaluate(self, test_set: str, privacy_aware: bool = True) -> Dict[str, Any]:
@@ -189,6 +246,19 @@ class PrivateTrainer:
         except ImportError:
             logger.warning("Opacus not available, using basic privacy tracking")
             self._privacy_accountant = None
+        
+        # Initialize quantum-inspired optimizer
+        self._quantum_optimizer = QuantumInspiredOptimizer(
+            privacy_config=self.privacy_config,
+            model_params=self._model.parameters() if self._model else None
+        )
+        
+        # Initialize adaptive privacy scheduler
+        self._adaptive_scheduler = AdaptivePrivacyScheduler(
+            initial_config=self.privacy_config
+        )
+        
+        logger.info("Quantum-inspired optimization and adaptive scheduling initialized")
     
     def _load_dataset(self, dataset_path: str) -> Any:
         """Load and prepare training dataset."""
