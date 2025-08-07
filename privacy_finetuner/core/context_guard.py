@@ -108,13 +108,18 @@ class ContextGuard:
     def _hash_entities(self, text: str) -> str:
         """Replace entities with consistent hashes."""
         import hashlib
-        import spacy
         
-        # Load spacy model for NER (in production, cache this)
         try:
-            nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            logger.warning("spaCy model not found, skipping entity hashing")
+            import spacy
+            
+            # Load spacy model for NER (in production, cache this)
+            try:
+                nlp = spacy.load("en_core_web_sm")
+            except OSError:
+                logger.warning("spaCy model not found, skipping entity hashing")
+                return text
+        except ImportError:
+            logger.warning("spaCy not available, skipping entity hashing")
             return text
         
         doc = nlp(text)

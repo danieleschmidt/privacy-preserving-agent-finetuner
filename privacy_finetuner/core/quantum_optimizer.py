@@ -1,12 +1,26 @@
 """Quantum-inspired optimization for privacy-preserving machine learning."""
 
-import numpy as np
-import torch
-import torch.nn as nn
-from typing import Dict, Any, List, Optional, Tuple
 import logging
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+import warnings
+
+# Handle optional dependencies gracefully
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    warnings.warn("NumPy not available. Quantum optimization will be limited.")
+
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    warnings.warn("PyTorch not available. Quantum optimization will use fallback methods.")
 
 from .privacy_config import PrivacyConfig
 
@@ -28,8 +42,8 @@ class QuantumGate(Enum):
 @dataclass
 class QuantumState:
     """Represents a quantum state for optimization."""
-    amplitudes: torch.Tensor
-    phases: torch.Tensor
+    amplitudes: Any  # torch.Tensor when available
+    phases: Any      # torch.Tensor when available
     entanglement_strength: float
     coherence_time: float
 
@@ -46,7 +60,7 @@ class QuantumInspiredOptimizer:
     def __init__(
         self,
         privacy_config: PrivacyConfig,
-        model_params: Optional[nn.Parameter] = None,
+        model_params: Optional[Any] = None,
         num_qubits: int = 8,
         coherence_time: float = 1000.0,
         entanglement_strength: float = 0.7
@@ -63,6 +77,13 @@ class QuantumInspiredOptimizer:
         self.privacy_config = privacy_config
         self.model_params = model_params
         self.num_qubits = num_qubits
+        
+        # Check for required dependencies
+        if not TORCH_AVAILABLE and model_params is not None:
+            logger.warning("PyTorch not available, quantum optimization will use fallback mode")
+        
+        if not NUMPY_AVAILABLE:
+            logger.warning("NumPy not available, quantum computations will be limited")
         self.coherence_time = coherence_time
         self.entanglement_strength = entanglement_strength
         

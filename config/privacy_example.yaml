@@ -1,0 +1,121 @@
+# Example Privacy Configuration
+# This file shows all available privacy settings for the Privacy-Preserving Agent Finetuner
+
+privacy:
+  # Core Differential Privacy Parameters
+  epsilon: 1.0          # Privacy budget (lower = more private)
+  delta: 1e-5          # Failure probability (typically 1/dataset_size)
+  max_grad_norm: 1.0   # Maximum gradient norm for clipping
+  noise_multiplier: 0.5 # Noise scaling factor
+  
+  # Privacy Accounting
+  accounting_mode: "rdp"  # Options: "rdp", "gdp"
+  target_delta: 1e-5     # Target delta for epsilon calculation
+  
+  # Federated Learning Settings
+  federated:
+    enabled: false
+    aggregation_method: "secure_sum"  # Options: "secure_sum", "dp_averaging"
+    min_clients: 5
+    client_fraction: 1.0
+    local_epochs: 1
+    
+  # Hardware Security
+  secure_compute:
+    provider: null  # Options: "aws_nitro", "intel_sgx", "azure_confidential"
+    attestation_required: false
+    enclave_size_mb: 512
+
+# Context Protection Settings
+context_protection:
+  strategies:
+    - type: "pii_removal"
+      sensitivity: "high"
+      patterns:
+        - "credit_card"
+        - "ssn"
+        - "email"
+        - "phone"
+    - type: "entity_hashing"
+      salt: "${HASH_SALT:-default_salt}"
+      preserve_relationships: true
+    - type: "semantic_encryption"
+      key_rotation_hours: 24
+      encryption_strength: "medium"
+
+# Model Configuration
+model:
+  base_model: "microsoft/DialoGPT-small"  # Use small model for testing
+  
+  # Training Parameters
+  training:
+    batch_size: 8
+    gradient_accumulation_steps: 4
+    learning_rate: 5e-5
+    warmup_steps: 100
+    max_steps: 1000
+    save_steps: 100
+    evaluation_steps: 50
+    
+  # Model Optimization
+  quantization:
+    enabled: true
+    bits: 8
+    
+  adapters:
+    type: "lora"  # Low-Rank Adaptation
+    r: 8
+    alpha: 16
+    dropout: 0.1
+
+# Monitoring and Logging
+monitoring:
+  privacy_dashboard: true
+  export_to: "prometheus"  # Options: "prometheus", "cloudwatch", "datadog"
+  alert_on_budget_exceed: true
+  log_level: "INFO"
+  structured_logging: true
+  
+  # Privacy Budget Alerts
+  budget_thresholds:
+    warning: 0.5    # 50% of budget used
+    critical: 0.8   # 80% of budget used
+    emergency: 0.95 # 95% of budget used
+
+# Security Settings
+security:
+  encryption_at_rest: true
+  encryption_in_transit: true
+  audit_all_operations: true
+  
+  # Access Control
+  require_authentication: true
+  session_timeout_minutes: 60
+  max_failed_attempts: 5
+  
+  # API Security
+  rate_limiting:
+    requests_per_minute: 60
+    burst_size: 10
+
+# Compliance Settings
+compliance:
+  regulations:
+    - "GDPR"
+    - "HIPAA"
+    - "CCPA"
+  
+  data_retention_days: 90
+  anonymization_threshold: 0.1
+  consent_required: true
+  
+  # Audit Requirements
+  audit_retention_years: 7
+  compliance_reporting: "monthly"
+
+# Development Settings (remove in production)
+development:
+  debug_mode: false
+  mock_gpu: false
+  fast_dev_run: false
+  profiling_enabled: false
