@@ -11,8 +11,22 @@ __license__ = "MIT"
 from .core.trainer import PrivateTrainer
 from .core.context_guard import ContextGuard
 from .core.privacy_config import PrivacyConfig
-from .api.server import create_app
-from .utils.monitoring import PrivacyBudgetMonitor
+
+# Import API server with graceful fallback
+try:
+    from .api.server import create_app
+except ImportError:
+    def create_app():
+        raise ImportError("FastAPI not available. Install with: pip install fastapi uvicorn")
+
+# Import monitoring with graceful fallback
+try:
+    from .utils.monitoring import PrivacyBudgetMonitor
+except ImportError:
+    class PrivacyBudgetMonitor:
+        def __init__(self, *args, **kwargs):
+            import warnings
+            warnings.warn("Monitoring utilities not fully available")
 
 __all__ = [
     "PrivateTrainer",

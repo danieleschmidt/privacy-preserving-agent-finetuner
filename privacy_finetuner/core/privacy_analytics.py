@@ -6,7 +6,12 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from collections import defaultdict, deque
 import json
-import numpy as np
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -224,8 +229,13 @@ class PrivacyAttackDetector:
             for output in list(self.model_outputs)[-20:]
         ]
         
-        avg_confidence = np.mean(recent_confidences)
-        confidence_std = np.std(recent_confidences)
+        if NUMPY_AVAILABLE:
+            avg_confidence = np.mean(recent_confidences)
+            confidence_std = np.std(recent_confidences)
+        else:
+            avg_confidence = sum(recent_confidences) / len(recent_confidences)
+            mean_conf = avg_confidence
+            confidence_std = (sum((x - mean_conf) ** 2 for x in recent_confidences) / len(recent_confidences)) ** 0.5
         
         # Anomaly if very high average confidence with low variance
         return avg_confidence > 0.9 and confidence_std < 0.05

@@ -3,7 +3,12 @@
 from dataclasses import dataclass
 from typing import Optional, Literal
 from pathlib import Path
-import yaml
+
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
 
 
 @dataclass
@@ -33,6 +38,9 @@ class PrivacyConfig:
     @classmethod
     def from_yaml(cls, config_path: Path) -> "PrivacyConfig":
         """Load privacy configuration from YAML file."""
+        if not YAML_AVAILABLE:
+            raise ImportError("PyYAML is required for YAML configuration loading. Install with: pip install PyYAML")
+        
         with open(config_path, 'r') as f:
             config_data = yaml.safe_load(f)
         
