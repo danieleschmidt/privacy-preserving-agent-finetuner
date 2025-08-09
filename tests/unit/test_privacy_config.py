@@ -52,11 +52,11 @@ class TestPrivacyConfig:
         """Test validation with invalid delta."""
         config = PrivacyConfig(delta=0.0)
         
-        with pytest.raises(ValueError, match="Delta must be between 0 and 1"):
+        with pytest.raises(ValueError, match="Privacy configuration validation failed"):
             config.validate()
         
         config = PrivacyConfig(delta=1.5)
-        with pytest.raises(ValueError, match="Delta must be between 0 and 1"):
+        with pytest.raises(ValueError, match="Privacy configuration validation failed"):
             config.validate()
     
     def test_validation_invalid_grad_norm(self):

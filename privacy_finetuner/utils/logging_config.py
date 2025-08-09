@@ -10,12 +10,38 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 class PrivacyAwareFormatter(logging.Formatter):
-    """Custom formatter that redacts sensitive information from logs."""
+    """Enhanced formatter with comprehensive privacy-aware redaction."""
     
+    def __init__(self, *args, enable_privacy_redaction=True, custom_patterns=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enable_privacy_redaction = enable_privacy_redaction
+        self.custom_patterns = custom_patterns or []
+        
     SENSITIVE_PATTERNS = [
         'password', 'secret', 'key', 'token', 'auth', 'credential',
-        'email', 'phone', 'ssn', 'card', 'account'
+        'email', 'phone', 'ssn', 'card', 'account', 'api_key'
     ]
+
+
+class ColoredFormatter(PrivacyAwareFormatter):
+    """Colored console formatter for better readability."""
+    
+    COLORS = {
+        'DEBUG': '\033[36m',    # Cyan
+        'INFO': '\033[32m',     # Green
+        'WARNING': '\033[33m',  # Yellow
+        'ERROR': '\033[31m',    # Red
+        'CRITICAL': '\033[35m', # Magenta
+    }
+    RESET = '\033[0m'
+    
+    def format(self, record):
+        """Format with colors if terminal supports it."""
+        formatted = super().format(record)
+        if sys.stdout.isatty():  # Only colorize if output is a terminal
+            color = self.COLORS.get(record.levelname, '')
+            formatted = f"{color}{formatted}{self.RESET}"
+        return formatted
     
     def format(self, record):
         """Format log record while redacting sensitive information."""

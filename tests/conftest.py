@@ -8,8 +8,19 @@ from typing import Generator, AsyncGenerator
 from unittest.mock import MagicMock, patch
 
 import pytest
-import torch
-from transformers import AutoConfig, AutoTokenizer
+
+# Handle optional dependencies gracefully
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
+try:
+    from transformers import AutoConfig, AutoTokenizer
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
 
 # Test configuration
 TEST_MODEL_NAME = "microsoft/DialoGPT-small"
@@ -104,6 +115,9 @@ def training_config():
 @pytest.fixture
 def test_tokenizer():
     """Create a test tokenizer."""
+    if not TRANSFORMERS_AVAILABLE:
+        pytest.skip("Transformers not available")
+    
     tokenizer = AutoTokenizer.from_pretrained(TEST_MODEL_NAME)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -113,6 +127,9 @@ def test_tokenizer():
 @pytest.fixture
 def test_model_config():
     """Create a test model config from HuggingFace."""
+    if not TRANSFORMERS_AVAILABLE:
+        pytest.skip("Transformers not available")
+    
     return AutoConfig.from_pretrained(TEST_MODEL_NAME)
 
 
@@ -301,13 +318,15 @@ def setup_test_env(monkeypatch):
 @pytest.fixture
 def gpu_available():
     """Check if GPU is available for testing."""
+    if not TORCH_AVAILABLE:
+        return False
     return torch.cuda.is_available()
 
 
 @pytest.fixture
 def skip_if_no_gpu():
     """Skip test if no GPU is available."""
-    if not torch.cuda.is_available():
+    if not TORCH_AVAILABLE or not torch.cuda.is_available():
         pytest.skip("GPU not available")
 
 
