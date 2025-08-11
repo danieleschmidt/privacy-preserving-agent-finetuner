@@ -1,0 +1,18 @@
+{
+  "recovery_id": "ec54a456ab6bec09",
+  "timestamp": "20250810_233203",
+  "epoch": 0,
+  "step": 0,
+  "model_state": null,
+  "optimizer_state": null,
+  "privacy_state": {
+    "epsilon_spent": 0.1,
+    "epsilon_total": 1.0
+  },
+  "training_metrics": {
+    "loss": 2.5,
+    "accuracy": 0.6
+  },
+  "system_state": {},
+  "data_hash": "36c4279e4d5763413c159f9b94549f0b014aab777adc4df131ebb5b3683f880b"
+}

@@ -3,7 +3,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "privacy-preserving-agent-finetuner"
+name = "privacy_finetuner"
 version = "0.1.0"
 description = "Enterprise-grade framework for fine-tuning LLMs with differential privacy guarantees"
 authors = ["Daniel Schmidt <daniel@terragon-labs.com>"]
