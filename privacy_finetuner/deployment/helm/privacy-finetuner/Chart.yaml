@@ -1,0 +1,48 @@
+apiVersion: v2
+name: privacy-finetuner
+description: A Helm chart for Privacy Finetuner - High-performance distributed training with privacy guarantees
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - machine-learning
+  - privacy
+  - distributed-training
+  - differential-privacy
+  - federated-learning
+  - gpu-computing
+
+home: https://github.com/privacy-finetuner/privacy-finetuner
+sources:
+  - https://github.com/privacy-finetuner/privacy-finetuner
+
+maintainers:
+  - name: Privacy Finetuner Team
+    email: maintainers@privacy-finetuner.example.com
+    url: https://privacy-finetuner.example.com
+
+dependencies:
+  - name: postgresql
+    version: 12.x.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  
+  - name: redis
+    version: 17.x.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  
+  - name: prometheus
+    version: 15.x.x
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+  
+  - name: grafana
+    version: 6.x.x
+    repository: https://grafana.github.io/helm-charts
+    condition: monitoring.grafana.enabled
+
+annotations:
+  category: Machine Learning
+  licenses: Apache-2.0

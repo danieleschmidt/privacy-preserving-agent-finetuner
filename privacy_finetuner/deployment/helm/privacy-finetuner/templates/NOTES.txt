@@ -1,0 +1,73 @@
+Privacy Finetuner has been deployed successfully!
+
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+Your application is available at:
+  - http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.master.type }}
+Get the application URL by running these commands:
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "privacy-finetuner.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.loadBalancer.type }}
+NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+      You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "privacy-finetuner.fullname" . }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "privacy-finetuner.fullname" . }}-loadbalancer --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.loadBalancer.port }}
+{{- else if contains "ClusterIP" .Values.service.master.type }}
+Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "privacy-finetuner.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:$CONTAINER_PORT
+{{- end }}
+
+Configuration:
+- Master Replicas: {{ .Values.master.replicaCount }}
+- Worker Replicas: {{ .Values.workers.replicaCount }}
+{{- if .Values.autoscaling.hpa.enabled }}
+- HPA Enabled: Workers can scale from {{ .Values.autoscaling.hpa.workers.minReplicas }} to {{ .Values.autoscaling.hpa.workers.maxReplicas }}
+{{- end }}
+{{- if .Values.persistence.data.enabled }}
+- Data Persistence: {{ .Values.persistence.data.size }} ({{ .Values.persistence.data.storageClass }})
+{{- end }}
+{{- if .Values.persistence.models.enabled }}
+- Models Persistence: {{ .Values.persistence.models.size }} ({{ .Values.persistence.models.storageClass }})
+{{- end }}
+
+Monitoring:
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+- Prometheus metrics available at: /metrics on port {{ .Values.service.metrics.port }}
+{{- end }}
+{{- if .Values.monitoring.grafana.enabled }}
+- Grafana dashboard enabled for comprehensive monitoring
+{{- end }}
+
+Privacy Configuration:
+- Epsilon: {{ .Values.config.privacy.epsilon }}
+- Delta: {{ .Values.config.privacy.delta }}
+- Noise Multiplier: {{ .Values.config.privacy.noiseMultiplier }}
+- Secure Mode: {{ .Values.config.privacy.secureMode }}
+
+Distributed Training:
+- World Size: {{ .Values.config.distributed.worldSize | default 4 }}
+- Backend: {{ .Values.config.distributed.backend }}
+- Mixed Precision: {{ .Values.config.gpu.mixedPrecision }}
+- Gradient Checkpointing: {{ .Values.config.gpu.gradientCheckpointing }}
+
+For more information on using Privacy Finetuner, check out the documentation at:
+https://github.com/privacy-finetuner/privacy-finetuner
+
+To check the status of your deployment:
+  kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}"
+
+To view logs:
+  kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}" -f
+
+To scale workers:
+  kubectl scale deployment {{ include "privacy-finetuner.fullname" . }}-worker --namespace {{ .Release.Namespace }} --replicas=5
+
+Happy Training! 🚀🔒

@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: privacy-finetuner-data-pv
+  labels:
+    app: privacy-finetuner
+    type: data
+spec:
+  capacity:
+    storage: 1000Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  nfs:
+    server: nfs-server.example.com
+    path: /exports/privacy-finetuner/data
+  mountOptions:
+    - vers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - intr
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: privacy-finetuner-models-pv
+  labels:
+    app: privacy-finetuner
+    type: models
+spec:
+  capacity:
+    storage: 500Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  nfs:
+    server: nfs-server.example.com
+    path: /exports/privacy-finetuner/models
+  mountOptions:
+    - vers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - intr
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: privacy-finetuner-cache-pv
+  labels:
+    app: privacy-finetuner
+    type: cache
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: fast-nvme
+  nfs:
+    server: nfs-server.example.com
+    path: /exports/privacy-finetuner/cache
+  mountOptions:
+    - vers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - intr
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: privacy-finetuner-data-pvc
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    type: data
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1000Gi
+  storageClassName: fast-ssd
+  selector:
+    matchLabels:
+      app: privacy-finetuner
+      type: data
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: privacy-finetuner-models-pvc
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    type: models
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: fast-ssd
+  selector:
+    matchLabels:
+      app: privacy-finetuner
+      type: models
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: privacy-finetuner-cache-pvc
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    type: cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: fast-nvme
+  selector:
+    matchLabels:
+      app: privacy-finetuner
+      type: cache
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+  labels:
+    app: privacy-finetuner
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "250"
+  encrypted: "true"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-nvme
+  labels:
+    app: privacy-finetuner
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: io2
+  iops: "10000"
+  encrypted: "true"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete

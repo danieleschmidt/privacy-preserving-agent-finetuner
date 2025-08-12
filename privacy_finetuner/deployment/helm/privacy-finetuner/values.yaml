@@ -1,0 +1,463 @@
+# Default values for privacy-finetuner
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  
+# Image configuration
+image:
+  registry: docker.io
+  repository: privacy-finetuner/privacy-finetuner
+  tag: "v1.0.0"
+  pullPolicy: IfNotPresent
+
+# Service account configuration
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# RBAC configuration
+rbac:
+  create: true
+  clusterRole: true
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: false
+  name: ""
+
+# Master node configuration
+master:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: privacy-finetuner/privacy-finetuner
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: "8"
+      memory: "32Gi"
+      nvidia.com/gpu: "2"
+    limits:
+      cpu: "16"
+      memory: "64Gi"
+      nvidia.com/gpu: "2"
+  
+  nodeSelector:
+    accelerator: nvidia-tesla-v100
+    node-type: gpu-optimized
+  
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  
+  affinity: {}
+  
+  podAnnotations: {}
+  podLabels: {}
+  
+  # Environment variables
+  env:
+    RANK: "0"
+    WORLD_SIZE: "4"
+    MASTER_PORT: "29500"
+    LOCAL_RANK: "0"
+    OMP_NUM_THREADS: "8"
+    MKL_NUM_THREADS: "8"
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+# Worker nodes configuration
+workers:
+  enabled: true
+  replicaCount: 3
+  
+  image:
+    repository: privacy-finetuner/privacy-finetuner
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: "6"
+      memory: "24Gi"
+      nvidia.com/gpu: "2"
+    limits:
+      cpu: "12"
+      memory: "48Gi"
+      nvidia.com/gpu: "2"
+  
+  nodeSelector:
+    accelerator: nvidia-tesla-v100
+    node-type: gpu-optimized
+  
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - privacy-finetuner
+          - key: app.kubernetes.io/component
+            operator: In
+            values:
+            - worker
+        topologyKey: kubernetes.io/hostname
+  
+  podAnnotations: {}
+  podLabels: {}
+  
+  # Environment variables
+  env:
+    WORLD_SIZE: "4"
+    MASTER_PORT: "29500"
+    COMPONENT_TYPE: "worker"
+    OMP_NUM_THREADS: "6"
+    MKL_NUM_THREADS: "6"
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+# Service configuration
+service:
+  master:
+    type: ClusterIP
+    port: 8080
+    targetPort: http
+    annotations: {}
+  
+  workers:
+    type: ClusterIP
+    port: 8080
+    targetPort: http
+    annotations: {}
+  
+  loadBalancer:
+    type: LoadBalancer
+    port: 80
+    targetPort: http
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    loadBalancerSourceRanges: []
+  
+  headless:
+    enabled: true
+    port: 29500
+  
+  metrics:
+    enabled: true
+    port: 9090
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9090"
+      prometheus.io/path: "/metrics"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10g"
+    nginx.ingress.kubernetes.io/rate-limit-requests-per-minute: "100"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  
+  hosts:
+    - host: privacy-finetuner.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          backend: master
+        - path: /api/v1/train
+          pathType: Prefix
+          backend: workers
+        - path: /api/v1/inference
+          pathType: Prefix
+          backend: workers
+    
+    - host: api.privacy-finetuner.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          backend: loadBalancer
+  
+  tls:
+    - secretName: privacy-finetuner-tls
+      hosts:
+        - privacy-finetuner.example.com
+        - api.privacy-finetuner.example.com
+
+# Auto-scaling configuration
+autoscaling:
+  hpa:
+    enabled: true
+    
+    master:
+      minReplicas: 1
+      maxReplicas: 1
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    
+    workers:
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+      customMetrics:
+        - type: Pods
+          pods:
+            metric:
+              name: training_queue_length
+            target:
+              type: AverageValue
+              averageValue: "5"
+  
+  vpa:
+    enabled: true
+    updateMode: "Auto"
+
+# Persistence configuration
+persistence:
+  data:
+    enabled: true
+    storageClass: "fast-ssd"
+    accessMode: ReadWriteMany
+    size: 1000Gi
+    annotations: {}
+  
+  models:
+    enabled: true
+    storageClass: "fast-ssd"
+    accessMode: ReadWriteMany
+    size: 500Gi
+    annotations: {}
+  
+  cache:
+    enabled: true
+    storageClass: "fast-nvme"
+    accessMode: ReadWriteMany
+    size: 200Gi
+    annotations: {}
+
+# Configuration
+config:
+  # Application settings
+  application:
+    name: "privacy-finetuner"
+    environment: "production"
+    logLevel: "INFO"
+  
+  # Server configuration
+  server:
+    host: "0.0.0.0"
+    port: 8080
+    workers: 4
+    timeout: 300
+  
+  # Distributed training
+  distributed:
+    backend: "nccl"
+    initMethod: "env://"
+  
+  # GPU settings
+  gpu:
+    mixedPrecision: true
+    gradientCheckpointing: true
+    memoryFraction: 0.9
+  
+  # Training parameters
+  training:
+    batchSize: 32
+    gradientAccumulationSteps: 4
+    learningRate: 0.0001
+    maxEpochs: 100
+    checkpointInterval: 10
+    validationInterval: 5
+  
+  # Privacy settings
+  privacy:
+    epsilon: 1.0
+    delta: 0.00001
+    noiseMultiplier: 1.1
+    maxGradNorm: 1.0
+    secureMode: true
+  
+  # Memory management
+  memory:
+    cacheSizeGb: 8
+    enableOffloading: true
+    poolSizeGb: 16
+    garbageCollection: true
+  
+  # Performance optimization
+  performance:
+    enableCaching: true
+    prefetchFactor: 2
+    numWorkers: 8
+    pinMemory: true
+    enableJit: true
+  
+  # Monitoring
+  monitoring:
+    metricsPort: 9090
+    enableProfiling: true
+    metricsInterval: 30
+
+# Secrets configuration
+secrets:
+  # Database credentials
+  database:
+    username: "privacy_finetuner"
+    password: "privacy_finetuner_password"
+  
+  # API keys (base64 encoded)
+  apiSecretKey: "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY="
+  jwtSecret: "and0X3NlY3JldF9rZXlfZm9yX2F1dGhlbnRpY2F0aW9u"
+  
+  # Model registry
+  modelRegistryToken: "bW9kZWxfcmVnaXN0cnlfdG9rZW5fZXhhbXBsZQ=="
+  
+  # Privacy encryption
+  privacyEncryptionKey: "cHJpdmFjeV9lbmNyeXB0aW9uX2tleV9zZWN1cmU="
+  
+  # External services
+  s3:
+    accessKey: "czNfYWNjZXNzX2tleV9leGFtcGxl"
+    secretKey: "czNfc2VjcmV0X2tleV9leGFtcGxl"
+  
+  # TLS certificates (base64 encoded)
+  tls:
+    crt: ""
+    key: ""
+  
+  # Docker registry
+  dockerRegistry:
+    username: "privacy-finetuner"
+    password: "registry-password"
+
+# Monitoring and observability
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+  
+  prometheusRule:
+    enabled: true
+    
+  grafana:
+    enabled: true
+    dashboard:
+      enabled: true
+  
+  logging:
+    fluentd:
+      enabled: true
+      elasticsearch:
+        host: "elasticsearch.logging.svc.cluster.local"
+        port: 9200
+
+# Network policies
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: privacy-finetuner
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+  egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: privacy-finetuner
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  master:
+    minAvailable: 1
+  workers:
+    minAvailable: 1
+
+# External dependencies
+postgresql:
+  enabled: true
+  auth:
+    username: privacy_finetuner
+    password: privacy_finetuner_password
+    database: privacy_finetuner
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: "fast-ssd"
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "redis_password"
+  master:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "fast-ssd"
+
+# Testing
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: 1.35
+    pullPolicy: IfNotPresent
