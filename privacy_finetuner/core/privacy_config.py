@@ -1,15 +1,28 @@
 """Privacy configuration management for differential privacy training."""
 
 import os
+import logging
 from dataclasses import dataclass
-from typing import Optional, Literal, Dict, Any
+from typing import Optional, Literal, Dict, Any, List
 from pathlib import Path
+from datetime import datetime
+
+from .validation import validate_and_raise, ConfigurationValidator
+from .exceptions import ValidationException, ConfigurationException
+
+logger = logging.getLogger(__name__)
 
 try:
     import yaml
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
+
+try:
+    import hashlib
+    HASHLIB_AVAILABLE = True
+except ImportError:
+    HASHLIB_AVAILABLE = False
 
 
 @dataclass

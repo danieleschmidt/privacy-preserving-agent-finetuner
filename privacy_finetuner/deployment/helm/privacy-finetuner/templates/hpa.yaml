@@ -1,0 +1,123 @@
+{{- if .Values.autoscaling.hpa.enabled }}
+{{- if .Values.master.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-master-hpa
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+    app.kubernetes.io/component: master
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "privacy-finetuner.fullname" . }}-master
+  minReplicas: {{ .Values.autoscaling.hpa.master.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.hpa.master.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.hpa.master.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.hpa.master.targetMemoryUtilizationPercentage }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+{{- end }}
+
+---
+
+{{- if .Values.workers.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-worker-hpa
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "privacy-finetuner.fullname" . }}-worker
+  minReplicas: {{ .Values.autoscaling.hpa.workers.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.hpa.workers.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.hpa.workers.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.hpa.workers.targetMemoryUtilizationPercentage }}
+  {{- if .Values.autoscaling.hpa.workers.customMetrics }}
+  {{- range .Values.autoscaling.hpa.workers.customMetrics }}
+  - type: {{ .type }}
+    {{- if eq .type "Pods" }}
+    pods:
+      metric:
+        name: {{ .pods.metric.name }}
+      target:
+        type: {{ .pods.target.type }}
+        averageValue: {{ .pods.target.averageValue | quote }}
+    {{- else if eq .type "Object" }}
+    object:
+      metric:
+        name: {{ .object.metric.name }}
+        {{- if .object.metric.selector }}
+        selector:
+          {{- toYaml .object.metric.selector | nindent 10 }}
+        {{- end }}
+      target:
+        type: {{ .object.target.type }}
+        value: {{ .object.target.value | quote }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Min
+{{- end }}
+{{- end }}

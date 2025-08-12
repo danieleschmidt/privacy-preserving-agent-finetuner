@@ -1,0 +1,166 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: privacy-finetuner-master-hpa
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    component: master
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: privacy-finetuner-master
+  minReplicas: 1
+  maxReplicas: 1  # Master should remain singular
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: privacy-finetuner-worker-hpa
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    component: worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: privacy-finetuner-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: training_queue_length
+      target:
+        type: AverageValue
+        averageValue: "5"
+  - type: Object
+    object:
+      metric:
+        name: privacy_finetuner_gpu_utilization
+        selector:
+          matchLabels:
+            app: privacy-finetuner
+            component: worker
+      target:
+        type: Value
+        value: "0.8"  # 80% GPU utilization
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Min
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: privacy-finetuner-master-vpa
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    component: master
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: privacy-finetuner-master
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: privacy-finetuner
+      minAllowed:
+        cpu: "4"
+        memory: "16Gi"
+      maxAllowed:
+        cpu: "24"
+        memory: "96Gi"
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: privacy-finetuner-worker-vpa
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    component: worker
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: privacy-finetuner-worker
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: privacy-finetuner-worker
+      minAllowed:
+        cpu: "3"
+        memory: "12Gi"
+      maxAllowed:
+        cpu: "18"
+        memory: "72Gi"
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits

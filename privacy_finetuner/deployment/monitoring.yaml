@@ -1,0 +1,389 @@
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: privacy-finetuner-metrics
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: privacy-finetuner
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http
+    scrapeTimeout: 10s
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'privacy_finetuner_.*'
+      targetLabel: __name__
+      replacement: '${1}'
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: privacy-finetuner-alerts
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: privacy-finetuner.rules
+    interval: 30s
+    rules:
+    
+    # High-level service health
+    - alert: PrivacyFinetunerDown
+      expr: up{job="privacy-finetuner-metrics"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: privacy-finetuner
+      annotations:
+        summary: "Privacy Finetuner service is down"
+        description: "Privacy Finetuner service has been down for more than 1 minute"
+    
+    # Performance alerts
+    - alert: HighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{pod=~"privacy-finetuner-.*"}[5m]) * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+        service: privacy-finetuner
+      annotations:
+        summary: "High CPU usage in Privacy Finetuner pod"
+        description: "CPU usage is above 80% for {{ $labels.pod }}"
+    
+    - alert: HighMemoryUsage
+      expr: container_memory_usage_bytes{pod=~"privacy-finetuner-.*"} / container_spec_memory_limit_bytes * 100 > 85
+      for: 3m
+      labels:
+        severity: warning
+        service: privacy-finetuner
+      annotations:
+        summary: "High memory usage in Privacy Finetuner pod"
+        description: "Memory usage is above 85% for {{ $labels.pod }}"
+    
+    - alert: LowGPUUtilization
+      expr: nvidia_gpu_utilization{pod=~"privacy-finetuner-.*"} < 30
+      for: 10m
+      labels:
+        severity: info
+        service: privacy-finetuner
+      annotations:
+        summary: "Low GPU utilization in Privacy Finetuner"
+        description: "GPU utilization is below 30% for {{ $labels.pod }}"
+    
+    # Training-specific alerts
+    - alert: TrainingStalled
+      expr: increase(privacy_finetuner_training_steps_total[10m]) == 0
+      for: 10m
+      labels:
+        severity: warning
+        service: privacy-finetuner
+      annotations:
+        summary: "Training appears to be stalled"
+        description: "No training progress detected in the last 10 minutes"
+    
+    - alert: HighTrainingLoss
+      expr: privacy_finetuner_training_loss > 10
+      for: 5m
+      labels:
+        severity: warning
+        service: privacy-finetuner
+      annotations:
+        summary: "Training loss is unusually high"
+        description: "Training loss is {{ $value }}, which may indicate training instability"
+    
+    # Privacy budget alerts
+    - alert: PrivacyBudgetLow
+      expr: privacy_finetuner_privacy_budget_remaining < 0.1
+      for: 1m
+      labels:
+        severity: critical
+        service: privacy-finetuner
+      annotations:
+        summary: "Privacy budget is running low"
+        description: "Privacy budget remaining is {{ $value }}, training should be stopped soon"
+    
+    # Infrastructure alerts
+    - alert: PodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total{pod=~"privacy-finetuner-.*"}[15m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+        service: privacy-finetuner
+      annotations:
+        summary: "Privacy Finetuner pod is crash looping"
+        description: "Pod {{ $labels.pod }} is restarting frequently"
+    
+    - alert: PVCAlmostFull
+      expr: kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"privacy-finetuner-.*"} / kubelet_volume_stats_capacity_bytes * 100 > 90
+      for: 2m
+      labels:
+        severity: warning
+        service: privacy-finetuner
+      annotations:
+        summary: "Privacy Finetuner PVC almost full"
+        description: "PVC {{ $labels.persistentvolumeclaim }} is {{ $value }}% full"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-privacy-finetuner
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    grafana_dashboard: "1"
+data:
+  privacy-finetuner-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Privacy Finetuner Dashboard",
+        "tags": ["privacy", "machine-learning", "training"],
+        "style": "dark",
+        "timezone": "browser",
+        "editable": true,
+        "hideControls": false,
+        "graphTooltip": 1,
+        "panels": [
+          {
+            "id": 1,
+            "title": "Training Progress",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "privacy_finetuner_training_steps_total",
+                "legendFormat": "Training Steps"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Steps",
+                "min": 0
+              }
+            ],
+            "xAxes": [
+              {
+                "mode": "time"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "Training Loss",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "privacy_finetuner_training_loss",
+                "legendFormat": "Training Loss"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Loss",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "id": 3,
+            "title": "GPU Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "nvidia_gpu_utilization",
+                "legendFormat": "GPU {{ $1 }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Utilization (%)",
+                "min": 0,
+                "max": 100
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 4,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{pod=~\"privacy-finetuner-.*\"} / 1024^3",
+                "legendFormat": "{{ $1 }} Memory (GB)"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Memory (GB)",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 8
+            }
+          },
+          {
+            "id": 5,
+            "title": "Privacy Budget",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "privacy_finetuner_privacy_budget_remaining",
+                "legendFormat": "Remaining Budget"
+              }
+            ],
+            "valueMaps": [
+              {
+                "op": "=",
+                "text": "EXHAUSTED",
+                "value": "0"
+              }
+            ],
+            "thresholds": "0.1,0.3",
+            "colorBackground": true,
+            "gridPos": {
+              "h": 4,
+              "w": 6,
+              "x": 0,
+              "y": 16
+            }
+          },
+          {
+            "id": 6,
+            "title": "Active Training Jobs",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "privacy_finetuner_active_jobs",
+                "legendFormat": "Active Jobs"
+              }
+            ],
+            "gridPos": {
+              "h": 4,
+              "w": 6,
+              "x": 6,
+              "y": 16
+            }
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "timepicker": {
+          "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+        },
+        "refresh": "30s"
+      }
+    }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: privacy-finetuner-log-aggregation
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+    component: logging
+spec:
+  selector:
+    app: fluentd
+    component: log-aggregator
+  ports:
+  - port: 24224
+    targetPort: 24224
+    protocol: TCP
+    name: forward
+  - port: 9880
+    targetPort: 9880
+    protocol: TCP
+    name: http
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-privacy-finetuner
+  namespace: privacy-finetuner
+  labels:
+    app: fluentd
+    component: log-aggregator
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+      component: log-aggregator
+  template:
+    metadata:
+      labels:
+        app: fluentd
+        component: log-aggregator
+    spec:
+      serviceAccountName: privacy-finetuner-service-account
+      containers:
+      - name: fluentd
+        image: fluent/fluentd-kubernetes-daemonset:v1.16-debian-elasticsearch7-1
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "100m"
+          limits:
+            memory: "400Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: fluentd-config
+          mountPath: /fluentd/etc
+        env:
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: "elasticsearch.logging.svc.cluster.local"
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9200"
+        - name: FLUENT_ELASTICSEARCH_SCHEME
+          value: "http"
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: fluentd-config
+        configMap:
+          name: fluentd-config

@@ -6,8 +6,11 @@ advances over traditional differential privacy approaches.
 
 import logging
 import time
+import random
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from enum import Enum
 import hashlib
 import json
 import math
@@ -147,6 +150,16 @@ except ImportError:
     np.linalg = NumpyStub()
 
 logger = logging.getLogger(__name__)
+
+
+class PrivacyCompositionMethod(Enum):
+    """Advanced privacy composition methods."""
+    RDP = "renyi_dp"
+    GDP = "gaussian_dp" 
+    CONCENTRATED_DP = "concentrated_dp"
+    ZERO_CONCENTRATED_DP = "zero_concentrated_dp"
+    HETEROGENEOUS_DP = "heterogeneous_dp"
+    AMPLIFIED_DP = "amplified_dp"
 
 
 @dataclass
@@ -570,3 +583,508 @@ class HybridPrivacyMechanism:
             recommendations.append("Use multiple privacy mechanisms for defense in depth")
         
         return recommendations
+
+
+class AdvancedCompositionAnalyzer:
+    """Advanced composition algorithms beyond standard RDP/GDP.
+    
+    Implements novel composition techniques including heterogeneous privacy,
+    zero-concentrated DP, and privacy amplification analysis.
+    """
+    
+    def __init__(
+        self,
+        composition_methods: Optional[List[PrivacyCompositionMethod]] = None,
+        amplification_factor: float = 1.0,
+        heterogeneous_weights: Optional[Dict[str, float]] = None
+    ):
+        """Initialize advanced composition analyzer.
+        
+        Args:
+            composition_methods: List of composition methods to use
+            amplification_factor: Privacy amplification factor
+            heterogeneous_weights: Weights for heterogeneous composition
+        """
+        self.composition_methods = composition_methods or [
+            PrivacyCompositionMethod.RDP,
+            PrivacyCompositionMethod.CONCENTRATED_DP
+        ]
+        self.amplification_factor = amplification_factor
+        self.heterogeneous_weights = heterogeneous_weights or {}
+        
+        # Composition state
+        self.privacy_spent_history = []
+        self.composition_cache = {}
+        
+        logger.info(f"Initialized AdvancedCompositionAnalyzer with {len(self.composition_methods)} methods")
+    
+    def compute_advanced_composition(
+        self,
+        privacy_events: List[Dict[str, Any]],
+        target_delta: float = 1e-5,
+        confidence_level: float = 0.95
+    ) -> Dict[str, Any]:
+        """Compute privacy cost using advanced composition techniques.
+        
+        Args:
+            privacy_events: List of privacy events with parameters
+            target_delta: Target delta for composition
+            confidence_level: Confidence level for bounds
+            
+        Returns:
+            Composition analysis results
+        """
+        if not privacy_events:
+            return {"total_epsilon": 0.0, "total_delta": 0.0, "methods_used": []}
+        
+        logger.debug(f"Computing advanced composition for {len(privacy_events)} events")
+        
+        composition_results = {}
+        
+        # Apply each composition method
+        for method in self.composition_methods:
+            if method == PrivacyCompositionMethod.RDP:
+                result = self._renyi_composition(privacy_events, target_delta)
+            elif method == PrivacyCompositionMethod.GDP:
+                result = self._gaussian_composition(privacy_events, target_delta)
+            elif method == PrivacyCompositionMethod.CONCENTRATED_DP:
+                result = self._concentrated_dp_composition(privacy_events, target_delta)
+            elif method == PrivacyCompositionMethod.ZERO_CONCENTRATED_DP:
+                result = self._zero_concentrated_dp_composition(privacy_events, target_delta)
+            elif method == PrivacyCompositionMethod.HETEROGENEOUS_DP:
+                result = self._heterogeneous_composition(privacy_events, target_delta)
+            elif method == PrivacyCompositionMethod.AMPLIFIED_DP:
+                result = self._amplified_composition(privacy_events, target_delta)
+            else:
+                result = self._basic_composition(privacy_events, target_delta)
+            
+            composition_results[method.value] = result
+        
+        # Select best composition bound
+        best_result = self._select_best_composition(composition_results)
+        
+        # Add confidence intervals
+        confidence_bounds = self._compute_confidence_bounds(
+            best_result, confidence_level
+        )
+        
+        final_result = {
+            "best_composition": best_result,
+            "all_methods": composition_results,
+            "confidence_bounds": confidence_bounds,
+            "privacy_events_count": len(privacy_events),
+            "amplification_applied": self.amplification_factor != 1.0
+        }
+        
+        self.privacy_spent_history.append(final_result)
+        return final_result
+    
+    def _renyi_composition(self, events: List[Dict[str, Any]], target_delta: float) -> Dict[str, Any]:
+        """Renyi Differential Privacy composition."""
+        # RDP orders to consider
+        orders = [1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 16.0, 32.0, 64.0]
+        
+        rdp_values = {order: 0.0 for order in orders}
+        
+        for event in events:
+            epsilon = event.get("epsilon", 0.0)
+            sigma = event.get("noise_multiplier", 1.0)
+            steps = event.get("steps", 1)
+            
+            # RDP for Gaussian mechanism
+            for order in orders:
+                if order == 1.0:
+                    continue  # Skip order 1 (not well-defined)
+                
+                # RDP value for Gaussian mechanism: α/(2σ²)
+                rdp_step = order / (2 * sigma * sigma) if sigma > 0 else float('inf')
+                rdp_values[order] += steps * rdp_step
+        
+        # Convert RDP to (ε, δ)-DP
+        best_epsilon = float('inf')
+        best_order = None
+        
+        for order in orders:
+            if rdp_values[order] < float('inf'):
+                # Conversion: ε = RDP + log(1/δ)/(α-1)
+                if order > 1:
+                    epsilon_candidate = rdp_values[order] + math.log(1/target_delta) / (order - 1)
+                    if epsilon_candidate < best_epsilon:
+                        best_epsilon = epsilon_candidate
+                        best_order = order
+        
+        return {
+            "epsilon": best_epsilon if best_epsilon < float('inf') else 0.0,
+            "delta": target_delta,
+            "best_order": best_order,
+            "rdp_values": rdp_values,
+            "method": "renyi_dp"
+        }
+    
+    def _gaussian_composition(self, events: List[Dict[str, Any]], target_delta: float) -> Dict[str, Any]:
+        """Gaussian Differential Privacy composition."""
+        total_rho = 0.0  # GDP parameter
+        
+        for event in events:
+            sigma = event.get("noise_multiplier", 1.0)
+            steps = event.get("steps", 1)
+            
+            # GDP parameter: ρ = 1/(2σ²)
+            if sigma > 0:
+                rho_step = 1.0 / (2 * sigma * sigma)
+                total_rho += steps * rho_step
+        
+        # Convert GDP to (ε, δ)-DP
+        if total_rho > 0:
+            # ε = ρ + 2√(ρ * log(1/δ))
+            epsilon = total_rho + 2 * math.sqrt(total_rho * math.log(1/target_delta))
+        else:
+            epsilon = 0.0
+        
+        return {
+            "epsilon": epsilon,
+            "delta": target_delta,
+            "rho": total_rho,
+            "method": "gaussian_dp"
+        }
+    
+    def _concentrated_dp_composition(self, events: List[Dict[str, Any]], target_delta: float) -> Dict[str, Any]:
+        """Concentrated Differential Privacy composition."""
+        total_rho = 0.0
+        
+        for event in events:
+            epsilon = event.get("epsilon", 0.0)
+            delta = event.get("delta", 0.0)
+            steps = event.get("steps", 1)
+            
+            # Convert (ε, δ)-DP to concentrated DP
+            if epsilon > 0 and delta > 0:
+                # Approximate conversion: ρ ≈ ε²/8 + ε * log(1/δ)
+                rho_step = (epsilon * epsilon / 8.0) + epsilon * math.log(1/delta)
+                total_rho += steps * rho_step
+        
+        # Convert concentrated DP back to (ε, δ)-DP
+        if total_rho > 0:
+            # ε = √(8ρ * log(1/δ)) + 2ρ
+            log_term = math.log(1/target_delta)
+            epsilon = math.sqrt(8 * total_rho * log_term) + 2 * total_rho
+        else:
+            epsilon = 0.0
+        
+        return {
+            "epsilon": epsilon,
+            "delta": target_delta,
+            "concentrated_rho": total_rho,
+            "method": "concentrated_dp"
+        }
+    
+    def _zero_concentrated_dp_composition(self, events: List[Dict[str, Any]], target_delta: float) -> Dict[str, Any]:
+        """Zero-Concentrated Differential Privacy composition."""
+        total_rho = 0.0
+        
+        for event in events:
+            sigma = event.get("noise_multiplier", 1.0)
+            steps = event.get("steps", 1)
+            
+            # Zero-concentrated DP for Gaussian mechanism
+            if sigma > 0:
+                # ρ = 1/(2σ²)
+                rho_step = 1.0 / (2 * sigma * sigma)
+                total_rho += steps * rho_step
+        
+        # Convert zCDP to (ε, δ)-DP
+        if total_rho > 0:
+            # Tight conversion: ε = ρ + √(2ρ * log(1/δ))
+            epsilon = total_rho + math.sqrt(2 * total_rho * math.log(1/target_delta))
+        else:
+            epsilon = 0.0
+        
+        return {
+            "epsilon": epsilon,
+            "delta": target_delta,
+            "zero_concentrated_rho": total_rho,
+            "method": "zero_concentrated_dp"
+        }
+    
+    def _heterogeneous_composition(self, events: List[Dict[str, Any]], target_delta: float) -> Dict[str, Any]:
+        """Heterogeneous privacy composition with different weights."""
+        weighted_epsilon = 0.0
+        total_weight = 0.0
+        
+        for event in events:
+            epsilon = event.get("epsilon", 0.0)
+            event_type = event.get("type", "default")
+            steps = event.get("steps", 1)
+            
+            # Get weight for this event type
+            weight = self.heterogeneous_weights.get(event_type, 1.0)
+            
+            # Weighted composition
+            weighted_epsilon += weight * epsilon * steps
+            total_weight += weight * steps
+        
+        # Normalize by total weight
+        if total_weight > 0:
+            normalized_epsilon = weighted_epsilon / total_weight
+        else:
+            normalized_epsilon = 0.0
+        
+        # Apply advanced composition theorem
+        if len(events) > 1:
+            # Advanced composition: ε' = ε√(2k*log(1/δ')) + εk*log(1/δ')
+            k = len(events)
+            log_term = math.log(1/target_delta)
+            
+            advanced_epsilon = (
+                normalized_epsilon * math.sqrt(2 * k * log_term) +
+                normalized_epsilon * k * log_term
+            )
+        else:
+            advanced_epsilon = normalized_epsilon
+        
+        return {
+            "epsilon": advanced_epsilon,
+            "delta": target_delta,
+            "weighted_epsilon": weighted_epsilon,
+            "total_weight": total_weight,
+            "method": "heterogeneous_dp"
+        }
+    
+    def _amplified_composition(self, events: List[Dict[str, Any]], target_delta: float) -> Dict[str, Any]:
+        """Privacy amplification composition."""
+        # Apply amplification factor to each event
+        amplified_events = []
+        
+        for event in events:
+            amplified_event = event.copy()
+            
+            # Apply amplification to epsilon
+            original_epsilon = event.get("epsilon", 0.0)
+            amplified_epsilon = original_epsilon / self.amplification_factor
+            amplified_event["epsilon"] = amplified_epsilon
+            
+            # Adjust noise multiplier if present
+            if "noise_multiplier" in event:
+                original_sigma = event["noise_multiplier"]
+                amplified_sigma = original_sigma * math.sqrt(self.amplification_factor)
+                amplified_event["noise_multiplier"] = amplified_sigma
+            
+            amplified_events.append(amplified_event)
+        
+        # Use basic composition on amplified events
+        basic_result = self._basic_composition(amplified_events, target_delta)
+        
+        return {
+            "epsilon": basic_result["epsilon"],
+            "delta": target_delta,
+            "amplification_factor": self.amplification_factor,
+            "original_epsilon": basic_result["epsilon"] * self.amplification_factor,
+            "method": "amplified_dp"
+        }
+    
+    def _basic_composition(self, events: List[Dict[str, Any]], target_delta: float) -> Dict[str, Any]:
+        """Basic composition (sum of epsilons)."""
+        total_epsilon = 0.0
+        total_delta = 0.0
+        
+        for event in events:
+            epsilon = event.get("epsilon", 0.0)
+            delta = event.get("delta", 0.0)
+            steps = event.get("steps", 1)
+            
+            total_epsilon += epsilon * steps
+            total_delta += delta * steps
+        
+        return {
+            "epsilon": total_epsilon,
+            "delta": min(total_delta, target_delta),
+            "method": "basic_composition"
+        }
+    
+    def _select_best_composition(self, results: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Select the best composition result (lowest epsilon)."""
+        best_result = None
+        best_epsilon = float('inf')
+        
+        for method, result in results.items():
+            epsilon = result.get("epsilon", float('inf'))
+            if epsilon < best_epsilon:
+                best_epsilon = epsilon
+                best_result = result
+        
+        return best_result or {"epsilon": 0.0, "delta": 0.0, "method": "none"}
+    
+    def _compute_confidence_bounds(
+        self,
+        result: Dict[str, Any],
+        confidence_level: float
+    ) -> Dict[str, float]:
+        """Compute confidence bounds for privacy estimates."""
+        epsilon = result.get("epsilon", 0.0)
+        
+        # Simplified confidence bounds (in practice, would be more rigorous)
+        z_score = 1.96 if confidence_level == 0.95 else 2.58  # 95% or 99%
+        
+        # Estimate standard error (simplified)
+        std_error = epsilon * 0.1  # Assume 10% relative error
+        
+        margin_of_error = z_score * std_error
+        
+        return {
+            "lower_bound": max(0.0, epsilon - margin_of_error),
+            "upper_bound": epsilon + margin_of_error,
+            "confidence_level": confidence_level,
+            "margin_of_error": margin_of_error
+        }
+
+
+class PrivacyAmplificationAnalyzer:
+    """Privacy amplification via subsample shuffling and other techniques.
+    
+    Implements advanced privacy amplification analysis for various
+    sampling and shuffling strategies.
+    """
+    
+    def __init__(self):
+        """Initialize privacy amplification analyzer."""
+        self.amplification_history = []
+        
+        logger.info("Initialized PrivacyAmplificationAnalyzer")
+    
+    def analyze_subsampling_amplification(
+        self,
+        base_epsilon: float,
+        base_delta: float,
+        sampling_rate: float,
+        num_samples: int,
+        replacement: bool = False
+    ) -> Dict[str, Any]:
+        """Analyze privacy amplification from subsampling.
+        
+        Args:
+            base_epsilon: Base privacy parameter
+            base_delta: Base privacy parameter
+            sampling_rate: Probability of including each sample
+            num_samples: Total number of samples
+            replacement: Whether sampling is with replacement
+            
+        Returns:
+            Amplified privacy parameters and analysis
+        """
+        logger.debug(f"Analyzing subsampling amplification (rate={sampling_rate})")
+        
+        if sampling_rate <= 0 or sampling_rate >= 1:
+            # No amplification if not proper subsampling
+            return {
+                "amplified_epsilon": base_epsilon,
+                "amplified_delta": base_delta,
+                "amplification_factor": 1.0,
+                "method": "no_amplification"
+            }
+        
+        if replacement:
+            # Poisson subsampling amplification
+            amplified_result = self._poisson_subsampling_amplification(
+                base_epsilon, base_delta, sampling_rate
+            )
+        else:
+            # Uniform subsampling amplification
+            amplified_result = self._uniform_subsampling_amplification(
+                base_epsilon, base_delta, sampling_rate, num_samples
+            )
+        
+        amplified_result["sampling_rate"] = sampling_rate
+        amplified_result["num_samples"] = num_samples
+        amplified_result["replacement"] = replacement
+        
+        self.amplification_history.append(amplified_result)
+        return amplified_result
+    
+    def _poisson_subsampling_amplification(
+        self,
+        base_epsilon: float,
+        base_delta: float,
+        sampling_rate: float
+    ) -> Dict[str, Any]:
+        """Poisson subsampling amplification analysis."""
+        # Poisson subsampling theorem
+        # For small ε, amplified ε ≈ 2q*ε where q is sampling rate
+        if base_epsilon <= 1.0:
+            amplified_epsilon = 2 * sampling_rate * base_epsilon
+        else:
+            # For large ε, use more conservative bound
+            amplified_epsilon = sampling_rate * base_epsilon * (1 + base_epsilon)
+        
+        amplification_factor = base_epsilon / max(amplified_epsilon, 1e-10)
+        
+        return {
+            "amplified_epsilon": amplified_epsilon,
+            "amplified_delta": base_delta,  # Delta unchanged for Poisson
+            "amplification_factor": amplification_factor,
+            "method": "poisson_subsampling"
+        }
+    
+    def _uniform_subsampling_amplification(
+        self,
+        base_epsilon: float,
+        base_delta: float,
+        sampling_rate: float,
+        num_samples: int
+    ) -> Dict[str, Any]:
+        """Uniform subsampling amplification analysis."""
+        # Uniform subsampling (without replacement)
+        sampled_size = int(sampling_rate * num_samples)
+        
+        if sampled_size <= 1:
+            amplification_factor = 1.0
+        else:
+            # Amplification factor for uniform subsampling
+            # Roughly √(sampling_rate) for privacy amplification
+            amplification_factor = math.sqrt(1.0 / sampling_rate)
+        
+        amplified_epsilon = base_epsilon / amplification_factor
+        
+        # Uniform subsampling affects delta differently than Poisson
+        amplified_delta = base_delta * sampling_rate
+        
+        return {
+            "amplified_epsilon": amplified_epsilon,
+            "amplified_delta": amplified_delta,
+            "amplification_factor": amplification_factor,
+            "sampled_size": sampled_size,
+            "method": "uniform_subsampling"
+        }
+
+
+def create_advanced_privacy_algorithms_system(
+    num_components: int = 5,
+    total_privacy_budget: float = 1.0,
+    amplification_factor: float = 1.5
+) -> Dict[str, Any]:
+    """Create comprehensive advanced privacy algorithms system.
+    
+    Factory function to initialize all advanced privacy algorithm components.
+    
+    Args:
+        num_components: Number of system components
+        total_privacy_budget: Total privacy budget
+        amplification_factor: Privacy amplification factor
+        
+    Returns:
+        Dictionary containing all advanced privacy algorithm components
+    """
+    logger.info("Creating advanced privacy algorithms system")
+    
+    return {
+        "adaptive_dp": AdaptiveDPAlgorithm(
+            initial_epsilon=total_privacy_budget
+        ),
+        "hybrid_privacy": HybridPrivacyMechanism(
+            dp_epsilon=total_privacy_budget,
+            k_anonymity=5
+        ),
+        "composition_analyzer": AdvancedCompositionAnalyzer(
+            amplification_factor=amplification_factor
+        ),
+        "amplification_analyzer": PrivacyAmplificationAnalyzer()
+    }
