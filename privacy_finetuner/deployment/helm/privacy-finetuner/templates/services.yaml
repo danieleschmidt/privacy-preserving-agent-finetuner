@@ -1,0 +1,155 @@
+{{- if .Values.master.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-master
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+    app.kubernetes.io/component: master
+  {{- with .Values.service.master.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.master.type }}
+  selector:
+    {{- include "privacy-finetuner.masterSelectorLabels" . | nindent 4 }}
+  ports:
+  - name: http
+    port: {{ .Values.service.master.port }}
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: {{ .Values.service.metrics.port }}
+    targetPort: metrics
+    protocol: TCP
+  - name: distributed
+    port: 29500
+    targetPort: distributed
+    protocol: TCP
+  - name: distributed-tcp
+    port: 29501
+    targetPort: distributed-tcp
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 300
+{{- end }}
+
+---
+
+{{- if .Values.workers.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-workers
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  {{- with .Values.service.workers.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.workers.type }}
+  selector:
+    {{- include "privacy-finetuner.workerSelectorLabels" . | nindent 4 }}
+  ports:
+  - name: http
+    port: {{ .Values.service.workers.port }}
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: {{ .Values.service.metrics.port }}
+    targetPort: metrics
+    protocol: TCP
+  - name: distributed
+    port: 29500
+    targetPort: distributed
+    protocol: TCP
+  sessionAffinity: None
+{{- end }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-loadbalancer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+    service-type: loadbalancer
+  {{- with .Values.service.loadBalancer.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.loadBalancer.type }}
+  selector:
+    {{- include "privacy-finetuner.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: http
+    port: {{ .Values.service.loadBalancer.port }}
+    targetPort: http
+    protocol: TCP
+  {{- with .Values.service.loadBalancer.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+
+---
+
+{{- if .Values.service.headless.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-headless
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+    service-type: headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    {{- include "privacy-finetuner.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: distributed
+    port: {{ .Values.service.headless.port }}
+    targetPort: distributed
+    protocol: TCP
+  - name: distributed-tcp
+    port: 29501
+    targetPort: distributed-tcp
+    protocol: TCP
+{{- end }}
+
+---
+
+{{- if .Values.service.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+    service-type: monitoring
+  {{- with .Values.service.metrics.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "privacy-finetuner.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: metrics
+    port: {{ .Values.service.metrics.port }}
+    targetPort: metrics
+    protocol: TCP
+{{- end }}

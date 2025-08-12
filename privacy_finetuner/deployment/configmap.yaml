@@ -1,0 +1,151 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: privacy-finetuner-config
+  namespace: privacy-finetuner
+  labels:
+    app: privacy-finetuner
+data:
+  # Application Configuration
+  app-config.yaml: |
+    application:
+      name: "privacy-finetuner"
+      version: "1.0.0"
+      environment: "production"
+    
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      workers: 4
+      timeout: 300
+    
+    # Distributed Training Configuration
+    distributed:
+      backend: "nccl"
+      init_method: "env://"
+      world_size: 4
+      rank: 0
+      local_rank: 0
+      master_addr: "privacy-finetuner-master"
+      master_port: "29500"
+    
+    # GPU Configuration
+    gpu:
+      devices: "auto"
+      memory_fraction: 0.9
+      mixed_precision: true
+      gradient_checkpointing: true
+    
+    # Training Configuration
+    training:
+      batch_size: 32
+      gradient_accumulation_steps: 4
+      learning_rate: 1e-4
+      max_epochs: 100
+      checkpoint_interval: 10
+      validation_interval: 5
+    
+    # Privacy Configuration
+    privacy:
+      epsilon: 1.0
+      delta: 1e-5
+      noise_multiplier: 1.1
+      max_grad_norm: 1.0
+      secure_mode: true
+    
+    # Memory Management
+    memory:
+      cache_size_gb: 8
+      enable_offloading: true
+      pool_size_gb: 16
+      garbage_collection: true
+    
+    # Performance Optimization
+    performance:
+      enable_caching: true
+      prefetch_factor: 2
+      num_workers: 8
+      pin_memory: true
+      enable_jit: true
+    
+    # Monitoring Configuration
+    monitoring:
+      metrics_port: 9090
+      enable_profiling: true
+      log_level: "INFO"
+      metrics_interval: 30
+    
+    # Auto-scaling Configuration
+    scaling:
+      min_replicas: 2
+      max_replicas: 10
+      target_cpu_utilization: 70
+      target_memory_utilization: 80
+      scale_up_stabilization: 60
+      scale_down_stabilization: 300
+
+  # Logging Configuration
+  logging-config.yaml: |
+    version: 1
+    disable_existing_loggers: false
+    
+    formatters:
+      standard:
+        format: '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+      
+      json:
+        format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+    
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: json
+        stream: ext://sys.stdout
+      
+      file:
+        class: logging.handlers.RotatingFileHandler
+        level: INFO
+        formatter: standard
+        filename: /var/log/privacy-finetuner/app.log
+        maxBytes: 100000000  # 100MB
+        backupCount: 5
+    
+    loggers:
+      privacy_finetuner:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+    
+    root:
+      level: WARNING
+      handlers: [console]
+
+  # Model Configuration
+  model-config.yaml: |
+    model:
+      name: "privacy_transformer"
+      architecture: "transformer"
+      hidden_size: 768
+      num_attention_heads: 12
+      num_hidden_layers: 12
+      intermediate_size: 3072
+      dropout: 0.1
+      attention_dropout: 0.1
+      layer_norm_eps: 1e-12
+      
+    tokenizer:
+      vocab_size: 50000
+      max_position_embeddings: 512
+      pad_token_id: 0
+      eos_token_id: 2
+      
+    optimization:
+      optimizer: "adamw"
+      weight_decay: 0.01
+      beta1: 0.9
+      beta2: 0.999
+      epsilon: 1e-8
+      warmup_steps: 1000

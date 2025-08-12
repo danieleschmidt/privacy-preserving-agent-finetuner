@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "privacy-finetuner.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "privacy-finetuner.labels" . | nindent 4 }}
+data:
+  app-config.yaml: |
+    application:
+      name: {{ .Values.config.application.name | quote }}
+      environment: {{ .Values.config.application.environment | quote }}
+      log_level: {{ .Values.config.application.logLevel | quote }}
+    
+    server:
+      host: {{ .Values.config.server.host | quote }}
+      port: {{ .Values.config.server.port }}
+      workers: {{ .Values.config.server.workers }}
+      timeout: {{ .Values.config.server.timeout }}
+    
+    distributed:
+      backend: {{ .Values.config.distributed.backend | quote }}
+      init_method: "env://"
+      world_size: {{ add .Values.master.replicaCount .Values.workers.replicaCount }}
+      master_addr: {{ include "privacy-finetuner.fullname" . }}-master
+      master_port: "29500"
+    
+    gpu:
+      mixed_precision: {{ .Values.config.gpu.mixedPrecision }}
+      gradient_checkpointing: {{ .Values.config.gpu.gradientCheckpointing }}
+      memory_fraction: {{ .Values.config.gpu.memoryFraction }}
+    
+    training:
+      batch_size: {{ .Values.config.training.batchSize }}
+      gradient_accumulation_steps: {{ .Values.config.training.gradientAccumulationSteps }}
+      learning_rate: {{ .Values.config.training.learningRate }}
+      max_epochs: {{ .Values.config.training.maxEpochs }}
+      checkpoint_interval: {{ .Values.config.training.checkpointInterval }}
+      validation_interval: {{ .Values.config.training.validationInterval }}
+    
+    privacy:
+      epsilon: {{ .Values.config.privacy.epsilon }}
+      delta: {{ .Values.config.privacy.delta }}
+      noise_multiplier: {{ .Values.config.privacy.noiseMultiplier }}
+      max_grad_norm: {{ .Values.config.privacy.maxGradNorm }}
+      secure_mode: {{ .Values.config.privacy.secureMode }}
+    
+    memory:
+      cache_size_gb: {{ .Values.config.memory.cacheSizeGb }}
+      enable_offloading: {{ .Values.config.memory.enableOffloading }}
+      pool_size_gb: {{ .Values.config.memory.poolSizeGb }}
+      garbage_collection: {{ .Values.config.memory.garbageCollection }}
+    
+    performance:
+      enable_caching: {{ .Values.config.performance.enableCaching }}
+      prefetch_factor: {{ .Values.config.performance.prefetchFactor }}
+      num_workers: {{ .Values.config.performance.numWorkers }}
+      pin_memory: {{ .Values.config.performance.pinMemory }}
+      enable_jit: {{ .Values.config.performance.enableJit }}
+    
+    monitoring:
+      metrics_port: {{ .Values.config.monitoring.metricsPort }}
+      enable_profiling: {{ .Values.config.monitoring.enableProfiling }}
+      log_level: {{ .Values.config.application.logLevel | quote }}
+      metrics_interval: {{ .Values.config.monitoring.metricsInterval }}
+    
+    scaling:
+      min_replicas: {{ .Values.autoscaling.hpa.workers.minReplicas | default 2 }}
+      max_replicas: {{ .Values.autoscaling.hpa.workers.maxReplicas | default 10 }}
+      target_cpu_utilization: {{ .Values.autoscaling.hpa.workers.targetCPUUtilizationPercentage | default 70 }}
+      target_memory_utilization: {{ .Values.autoscaling.hpa.workers.targetMemoryUtilizationPercentage | default 80 }}
+      scale_up_stabilization: 60
+      scale_down_stabilization: 300
+
+  logging-config.yaml: |
+    version: 1
+    disable_existing_loggers: false
+    
+    formatters:
+      standard:
+        format: '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+      
+      json:
+        format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+    
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: {{ .Values.config.application.logLevel }}
+        formatter: json
+        stream: ext://sys.stdout
+      
+      file:
+        class: logging.handlers.RotatingFileHandler
+        level: {{ .Values.config.application.logLevel }}
+        formatter: standard
+        filename: /var/log/privacy-finetuner/app.log
+        maxBytes: 100000000
+        backupCount: 5
+    
+    loggers:
+      privacy_finetuner:
+        level: {{ .Values.config.application.logLevel }}
+        handlers: [console, file]
+        propagate: false
+    
+    root:
+      level: WARNING
+      handlers: [console]
+
+  model-config.yaml: |
+    model:
+      name: "privacy_transformer"
+      architecture: "transformer"
+      hidden_size: 768
+      num_attention_heads: 12
+      num_hidden_layers: 12
+      intermediate_size: 3072
+      dropout: 0.1
+      attention_dropout: 0.1
+      layer_norm_eps: 1e-12
+      
+    tokenizer:
+      vocab_size: 50000
+      max_position_embeddings: 512
+      pad_token_id: 0
+      eos_token_id: 2
+      
+    optimization:
+      optimizer: "adamw"
+      weight_decay: 0.01
+      beta1: 0.9
+      beta2: 0.999
+      epsilon: 1e-8
+      warmup_steps: 1000
