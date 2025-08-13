@@ -1,0 +1,26 @@
+{
+  "performance": {
+    "improvement_percentage": 98.62675322336007,
+    "target_met": true,
+    "final_throughput": 30628,
+    "memory_reduction": 25.00000000000001
+  },
+  "scaling": {
+    "max_nodes_reached": 100,
+    "avg_decision_time": 0.001237789789835612,
+    "hundred_plus_capable": true,
+    "scaling_scenarios": 6
+  },
+  "memory": {
+    "memory_reduction_percentage": 4.306921100917432,
+    "target_met": false,
+    "memory_saved_gb": 0.9389088000000001,
+    "optimizations_applied": 5
+  },
+  "cost": {
+    "cost_savings_percentage": 46.155913978494624,
+    "target_met": true,
+    "savings_per_hour": 343.4,
+    "monthly_savings": 247247.99999999994
+  }
+}
