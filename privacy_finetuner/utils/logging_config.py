@@ -767,7 +767,7 @@ def setup_enhanced_logging(
     # Setup specialized loggers with enhanced configuration
     _setup_specialized_loggers(log_file, formatter, async_logging)
     
-    logger.info(f"Enhanced logging configured: level={log_level}, structured={structured_logging}, async={async_logging}")
+    root_logger.info(f"Enhanced logging configured: level={log_level}, structured={structured_logging}, async={async_logging}")
 
 
 def _setup_specialized_loggers(log_file: Optional[str], formatter, async_logging: bool):

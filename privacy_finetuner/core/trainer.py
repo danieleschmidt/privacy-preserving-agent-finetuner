@@ -1,6 +1,6 @@
 """Private trainer implementation with differential privacy guarantees."""
 
-from typing import Dict, Any, Optional, Union, Tuple
+from typing import Dict, Any, Optional, Union, Tuple, List
 from pathlib import Path
 import logging
 from datetime import datetime

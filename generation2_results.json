@@ -1,0 +1,55 @@
+{
+  "threat_detection": {
+    "average_response_time": 0.10025358200073242,
+    "max_response_time": 0.10025930404663086,
+    "sub_2s_compliant": true,
+    "threats_detected": 0
+  },
+  "failure_recovery": {
+    "success_rate": 100.0,
+    "average_recovery_time": 0.00111083984375,
+    "total_scenarios": 5,
+    "meets_95_percent": true
+  },
+  "robust_execution": {
+    "execution_results": [
+      {
+        "scenario": "Successful execution",
+        "success": true,
+        "attempts": 1,
+        "time": 0.00018334388732910156,
+        "circuit_state": "closed"
+      },
+      {
+        "scenario": "Transient failure with recovery",
+        "success": true,
+        "attempts": 1,
+        "time": 0.0001633167266845703,
+        "circuit_state": "closed"
+      },
+      {
+        "scenario": "Persistent failure",
+        "success": true,
+        "attempts": 1,
+        "time": 0.00014662742614746094,
+        "circuit_state": "closed"
+      }
+    ],
+    "executor_metrics": {
+      "circuit_breaker_enabled": true,
+      "retry_enabled": true,
+      "circuit_breaker": {
+        "state": "closed",
+        "total_calls": 3,
+        "total_failures": 2,
+        "total_successes": 1,
+        "success_rate": 0.3333333333333333,
+        "failure_count": 2,
+        "recent_calls": 3,
+        "avg_execution_time": 1.708666483561198e-05,
+        "state_changes": 0,
+        "last_failure_time": 1755120908.0475707
+      }
+    }
+  }
+}
