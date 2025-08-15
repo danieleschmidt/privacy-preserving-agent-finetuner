@@ -1,0 +1,27 @@
+{
+  "recovery_id": "3aece0cc8619ba73",
+  "timestamp": "20250815_033802",
+  "epoch": 1,
+  "step": 100,
+  "model_state": {
+    "weights": "mock_weights_epoch_1"
+  },
+  "optimizer_state": {
+    "lr": 5e-05,
+    "momentum": 0.9
+  },
+  "privacy_state": {
+    "epsilon_spent": 0.1,
+    "epsilon_total": 2.0,
+    "delta": 1e-05
+  },
+  "training_metrics": {
+    "loss": 2.5,
+    "accuracy": 0.65
+  },
+  "system_state": {
+    "gpu_memory_gb": 12.5,
+    "cpu_usage": 70
+  },
+  "data_hash": "794721d940342eca8632614f02663bf1241311bf162f4c650b67c1c8d3b894dd"
+}
