@@ -114,19 +114,191 @@ class PrivacyBudgetMonitor:
         # Log alert
         logger.warning(alert_message)
         
-        # TODO: Add integrations for:
-        # - Slack webhook
-        # - Email notifications
-        # - PagerDuty alerts
-        # - Prometheus alertmanager
+        # Slack webhook integration
+        self._send_slack_notification(alert_message, utilization)
         
-        # Example Prometheus metric (if prometheus_client available)
+        # Email notification integration
+        self._send_email_notification(alert_message, utilization)
+        
+        # PagerDuty alert integration
+        self._send_pagerduty_alert(alert_message, utilization)
+        
+        # Prometheus alertmanager integration
+        self._send_prometheus_alert(utilization, current_spent)
+        
+        # Update Prometheus metrics
         try:
-            from prometheus_client import Counter
+            from prometheus_client import Counter, Gauge
             privacy_alerts = Counter('privacy_budget_alerts_total', 'Privacy budget alerts')
+            privacy_budget_utilization = Gauge('privacy_budget_utilization', 'Privacy budget utilization ratio')
+            
             privacy_alerts.inc()
+            privacy_budget_utilization.set(utilization)
         except ImportError:
             pass
+    
+    def _send_slack_notification(self, message: str, utilization: float):
+        """Send alert to Slack webhook."""
+        try:
+            import requests
+            import os
+            
+            webhook_url = os.getenv('SLACK_WEBHOOK_URL')
+            if not webhook_url:
+                return
+            
+            payload = {
+                "text": f"🚨 {message}",
+                "attachments": [{
+                    "color": "danger" if utilization > 0.9 else "warning",
+                    "fields": [
+                        {"title": "Utilization", "value": f"{utilization:.1%}", "short": True},
+                        {"title": "Timestamp", "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "short": True}
+                    ]
+                }]
+            }
+            
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            if response.status_code == 200:
+                logger.info("Slack notification sent successfully")
+            else:
+                logger.error(f"Failed to send Slack notification: {response.status_code}")
+                
+        except Exception as e:
+            logger.error(f"Error sending Slack notification: {e}")
+    
+    def _send_email_notification(self, message: str, utilization: float):
+        """Send alert via email."""
+        try:
+            import smtplib
+            import os
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            
+            smtp_host = os.getenv('SMTP_HOST')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            alert_emails = os.getenv('ALERT_EMAILS', '').split(',')
+            
+            if not all([smtp_host, smtp_user, smtp_password, alert_emails[0]]):
+                return
+            
+            msg = MIMEMultipart()
+            msg['From'] = smtp_user
+            msg['To'] = ', '.join(alert_emails)
+            msg['Subject'] = f"Privacy Budget Alert - {utilization:.1%} Consumed"
+            
+            body = f"""
+Privacy Budget Alert
+
+{message}
+
+Details:
+- Total Budget: {self.total_epsilon}
+- Current Utilization: {utilization:.1%}
+- Remaining Budget: {self.get_remaining_budget():.3f}
+- Alert Timestamp: {datetime.now().isoformat()}
+
+Please review privacy budget usage and take appropriate action if necessary.
+            """
+            
+            msg.attach(MIMEText(body, 'plain'))
+            
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, alert_emails, msg.as_string())
+                
+            logger.info("Email notification sent successfully")
+            
+        except Exception as e:
+            logger.error(f"Error sending email notification: {e}")
+    
+    def _send_pagerduty_alert(self, message: str, utilization: float):
+        """Send alert to PagerDuty."""
+        try:
+            import requests
+            import os
+            
+            integration_key = os.getenv('PAGERDUTY_INTEGRATION_KEY')
+            if not integration_key:
+                return
+            
+            severity = "critical" if utilization > 0.95 else "warning"
+            
+            payload = {
+                "routing_key": integration_key,
+                "event_action": "trigger",
+                "dedup_key": f"privacy-budget-{datetime.now().strftime('%Y%m%d')}",
+                "payload": {
+                    "summary": message,
+                    "source": "privacy-finetuner",
+                    "severity": severity,
+                    "component": "privacy-budget-monitor",
+                    "group": "privacy-compliance",
+                    "class": "budget-alert",
+                    "custom_details": {
+                        "utilization": utilization,
+                        "total_budget": self.total_epsilon,
+                        "remaining_budget": self.get_remaining_budget(),
+                        "total_operations": len(self.events)
+                    }
+                }
+            }
+            
+            response = requests.post(
+                'https://events.pagerduty.com/v2/enqueue',
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 202:
+                logger.info("PagerDuty alert sent successfully")
+            else:
+                logger.error(f"Failed to send PagerDuty alert: {response.status_code}")
+                
+        except Exception as e:
+            logger.error(f"Error sending PagerDuty alert: {e}")
+    
+    def _send_prometheus_alert(self, utilization: float, current_spent: float):
+        """Send alert to Prometheus Alertmanager."""
+        try:
+            import requests
+            import os
+            
+            alertmanager_url = os.getenv('ALERTMANAGER_URL')
+            if not alertmanager_url:
+                return
+            
+            alert_payload = [{
+                "labels": {
+                    "alertname": "PrivacyBudgetThresholdExceeded",
+                    "service": "privacy-finetuner",
+                    "severity": "critical" if utilization > 0.95 else "warning",
+                    "component": "privacy-budget-monitor"
+                },
+                "annotations": {
+                    "summary": f"Privacy budget {utilization:.1%} consumed",
+                    "description": f"Privacy budget utilization is {utilization:.1%} ({current_spent:.3f}/{self.total_epsilon})",
+                    "runbook_url": "https://docs.privacy-finetuner.com/runbooks/privacy-budget"
+                },
+                "generatorURL": "http://privacy-finetuner/metrics"
+            }]
+            
+            response = requests.post(
+                f"{alertmanager_url}/api/v1/alerts",
+                json=alert_payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info("Prometheus alert sent successfully")
+            else:
+                logger.error(f"Failed to send Prometheus alert: {response.status_code}")
+                
+        except Exception as e:
+            logger.error(f"Error sending Prometheus alert: {e}")
     
     def export_events_json(self) -> str:
         """Export privacy events as JSON for audit purposes."""
