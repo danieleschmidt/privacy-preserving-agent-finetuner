@@ -930,7 +930,8 @@ class IntelligentLoadBalancer:
                         logger.warning(f"Node {node.node_id} marked as unhealthy after {node.health_check_failures} failures")
                         node.state = NodeState.UNHEALTHY
                         
-                        # TODO: Trigger alerts/notifications
+                        # Trigger alerts/notifications for unhealthy node
+                        self._trigger_node_health_alert(node)
                 
         except Exception as e:
             logger.error(f"Error checking health of node {node.node_id}: {e}")
