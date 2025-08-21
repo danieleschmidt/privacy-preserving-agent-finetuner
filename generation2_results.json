@@ -1,13 +1,13 @@
 {
   "threat_detection": {
-    "average_response_time": 0.10025358200073242,
-    "max_response_time": 0.10025930404663086,
+    "average_response_time": 0.10038316249847412,
+    "max_response_time": 0.10039305686950684,
     "sub_2s_compliant": true,
     "threats_detected": 0
   },
   "failure_recovery": {
     "success_rate": 100.0,
-    "average_recovery_time": 0.00111083984375,
+    "average_recovery_time": 0.0010746479034423827,
     "total_scenarios": 5,
     "meets_95_percent": true
   },
@@ -17,7 +17,7 @@
         "scenario": "Successful execution",
         "success": true,
         "attempts": 1,
-        "time": 0.00018334388732910156,
+        "time": 9.417533874511719e-05,
         "circuit_state": "closed"
       },
       {
@@ -31,7 +31,7 @@
         "scenario": "Persistent failure",
         "success": true,
         "attempts": 1,
-        "time": 0.00014662742614746094,
+        "time": 0.0001442432403564453,
         "circuit_state": "closed"
       }
     ],
@@ -46,9 +46,9 @@
         "success_rate": 0.3333333333333333,
         "failure_count": 2,
         "recent_calls": 3,
-        "avg_execution_time": 1.708666483561198e-05,
+        "avg_execution_time": 1.5417734781901043e-05,
         "state_changes": 0,
-        "last_failure_time": 1755120908.0475707
+        "last_failure_time": 1755818731.2309926
       }
     }
   }

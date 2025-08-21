@@ -1,0 +1,26 @@
+{
+  "recovery_id": "d74e40059be96636",
+  "timestamp": "20250821_232529",
+  "epoch": 2,
+  "step": 200,
+  "model_state": {
+    "weights": "simulated_weights_2"
+  },
+  "optimizer_state": {
+    "lr": 0.001,
+    "momentum": 0.9
+  },
+  "privacy_state": {
+    "epsilon_spent": 0.2,
+    "delta": 1e-05
+  },
+  "training_metrics": {
+    "loss": 2.1,
+    "accuracy": 0.7999999999999999
+  },
+  "system_state": {
+    "gpu_memory": 8000,
+    "cpu_usage": 50
+  },
+  "data_hash": "06b79cd7087825c9050bc9870dcc112e2b720312de335aecbc61ca152478df5a"
+}
