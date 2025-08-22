@@ -195,7 +195,8 @@ class IntelligentAutoScaler:
         self,
         config: Optional[Dict[str, Any]] = None,
         resource_manager: Optional[Any] = None,
-        privacy_tracker: Optional[Any] = None
+        privacy_tracker: Optional[Any] = None,
+        max_nodes: Optional[int] = None
     ):
         """Initialize intelligent auto-scaler.
         
@@ -203,10 +204,12 @@ class IntelligentAutoScaler:
             config: Scaling configuration
             resource_manager: Resource management interface
             privacy_tracker: Privacy budget tracker
+            max_nodes: Maximum number of nodes for scaling
         """
         self.config = config or {}
         self.resource_manager = resource_manager or MockResourceManager()
         self.privacy_tracker = privacy_tracker
+        self.max_nodes = max_nodes or 100
         
         # Initialize components
         self.workload_predictor = WorkloadPredictor()
