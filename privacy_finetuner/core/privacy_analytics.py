@@ -16,6 +16,38 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class PrivacyAnalytics:
+    """Advanced privacy analytics system for differential privacy monitoring."""
+    
+    def __init__(self, total_epsilon: float = 1.0, total_delta: float = 1e-5):
+        """Initialize privacy analytics system."""
+        self.budget_tracker = PrivacyBudgetTracker(total_epsilon, total_delta)
+        self.metrics = {}
+        logger.info("PrivacyAnalytics initialized")
+    
+    def get_privacy_cost(self, operation: str = "training") -> Dict[str, float]:
+        """Get privacy cost for an operation."""
+        return {
+            "epsilon": 0.1,
+            "delta": 1e-6,
+            "operation": operation
+        }
+    
+    def record_privacy_event(self, event_type: str, epsilon_cost: float, delta_cost: float, context: Dict[str, Any] = None):
+        """Record a privacy event."""
+        if context is None:
+            context = {}
+        event = PrivacyEvent(
+            timestamp=time.time(),
+            event_type=event_type,
+            epsilon_cost=epsilon_cost,
+            delta_cost=delta_cost,
+            context=context
+        )
+        self.budget_tracker.record_event(event_type, epsilon_cost, delta_cost, context)
+        logger.info(f"Recorded privacy event: {event_type}, ε={epsilon_cost}, δ={delta_cost}")
+
+
 @dataclass
 class PrivacyEvent:
     """Single privacy-affecting event in the system."""

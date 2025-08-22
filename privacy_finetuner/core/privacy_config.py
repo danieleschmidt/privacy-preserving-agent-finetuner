@@ -188,6 +188,35 @@ class PrivacyConfig:
         import math
         return math.sqrt(subsampling_rate)
     
+    def get_privacy_cost(self, operation: str = "training", steps: int = 1) -> Dict[str, float]:
+        """Get privacy cost for a specific operation.
+        
+        Args:
+            operation: Type of operation (training, evaluation, etc.)
+            steps: Number of steps for the operation
+            
+        Returns:
+            Dictionary containing privacy costs
+        """
+        # Base privacy cost calculation
+        base_epsilon = self.epsilon * 0.1 * steps  # 10% of budget per step
+        base_delta = self.delta * 0.1 * steps
+        
+        # Adjust based on operation type
+        if operation == "evaluation":
+            base_epsilon *= 0.5  # Evaluation uses less budget
+            base_delta *= 0.5
+        elif operation == "inference":
+            base_epsilon *= 0.1  # Inference uses minimal budget
+            base_delta *= 0.1
+            
+        return {
+            "epsilon": min(base_epsilon, self.epsilon),
+            "delta": min(base_delta, self.delta),
+            "operation": operation,
+            "steps": steps
+        }
+    
     def remaining_budget(self, steps: int, sample_rate: float) -> float:
         """Calculate remaining privacy budget.
         
