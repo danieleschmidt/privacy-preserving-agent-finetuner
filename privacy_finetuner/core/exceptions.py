@@ -231,3 +231,82 @@ class ValidationException(PrivacyPreservingException):
         self.field = field
         self.value = value
         self.expected_type = expected_type
+
+
+# Enhanced exception hierarchy for robustness
+class RecoverableException(PrivacyPreservingException):
+    """Base class for recoverable exceptions."""
+    
+    def __init__(self, message: str, recovery_strategy: str = None, **kwargs):
+        super().__init__(message, **kwargs)
+        self.recovery_strategy = recovery_strategy
+        self.is_recoverable = True
+
+
+class TransientException(RecoverableException):
+    """Exceptions that are temporary and should be retried."""
+    
+    def __init__(self, message: str, max_retries: int = 3, **kwargs):
+        super().__init__(message, recovery_strategy="retry", **kwargs)
+        self.max_retries = max_retries
+
+
+class CriticalException(PrivacyPreservingException):
+    """Critical exceptions that require immediate attention."""
+    
+    def __init__(self, message: str, component: str = None, **kwargs):
+        super().__init__(message, **kwargs)
+        self.component = component
+        self.is_critical = True
+        self.requires_immediate_action = True
+
+
+# Memory optimization exception
+class MemoryOptimizationException(PrivacyPreservingException):
+    """Raised when memory optimization fails."""
+    
+    def __init__(
+        self, 
+        message: str, 
+        current_usage: float = None,
+        target_reduction: float = None,
+        context: Dict[str, Any] = None
+    ):
+        super().__init__(message, "MEMORY_OPTIMIZATION_FAILED", context)
+        self.current_usage = current_usage
+        self.target_reduction = target_reduction
+
+
+# Exception registry for enhanced error handling
+class ExceptionRegistry:
+    """Registry for exception handlers and recovery strategies."""
+    
+    def __init__(self):
+        self._handlers = {}
+        self._recovery_strategies = {}
+    
+    def register_handler(self, exception_type: type, handler_func):
+        """Register an exception handler."""
+        self._handlers[exception_type] = handler_func
+    
+    def register_recovery_strategy(self, exception_type: type, strategy_func):
+        """Register a recovery strategy."""
+        self._recovery_strategies[exception_type] = strategy_func
+    
+    def handle_exception(self, exception: Exception) -> bool:
+        """Handle an exception using registered handlers."""
+        handler = self._handlers.get(type(exception))
+        if handler:
+            return handler(exception)
+        return False
+    
+    def recover_from_exception(self, exception: Exception) -> bool:
+        """Attempt recovery from an exception."""
+        strategy = self._recovery_strategies.get(type(exception))
+        if strategy:
+            return strategy(exception)
+        return False
+
+
+# Global exception registry
+exception_registry = ExceptionRegistry()

@@ -7,7 +7,7 @@
   },
   "scaling": {
     "max_nodes_reached": 100,
-    "avg_decision_time": 0.001237789789835612,
+    "avg_decision_time": 0.0011262893676757812,
     "hundred_plus_capable": true,
     "scaling_scenarios": 6
   },
