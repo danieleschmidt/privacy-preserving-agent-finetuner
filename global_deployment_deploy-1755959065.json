@@ -1,0 +1,118 @@
+{
+  "deployment_id": "deploy-1755959065",
+  "start_time": 1755959065.4448664,
+  "regions": {
+    "us-east-1": {
+      "region": "us-east-1",
+      "status": "failed",
+      "compliance_validation": {
+        "compliant": false,
+        "compliance_score": 0.75,
+        "violations": [
+          "GDPR requires data residency in EU"
+        ],
+        "recommendations": [
+          "\u2705 Encryption requirements met for GDPR",
+          "Consider adding privacy notice alerts",
+          "\u2705 HIPAA encryption requirements met",
+          "\u2705 HIPAA audit logging enabled",
+          "\u2705 HIPAA access controls implemented"
+        ],
+        "region": "us-east-1"
+      },
+      "localization_config": {},
+      "cloud_deployments": {},
+      "monitoring_setup": {},
+      "deployment_time": 0,
+      "error": "Compliance validation failed: ['GDPR requires data residency in EU']"
+    },
+    "eu-central-1": {
+      "region": "eu-central-1",
+      "status": "failed",
+      "compliance_validation": {
+        "compliant": false,
+        "compliance_score": 0.8571428571428571,
+        "violations": [],
+        "recommendations": [
+          "\u2705 Encryption requirements met for GDPR",
+          "\u2705 Data residency requirements configured",
+          "Consider adding privacy notice alerts",
+          "\u2705 HIPAA encryption requirements met",
+          "\u2705 HIPAA audit logging enabled",
+          "\u2705 HIPAA access controls implemented"
+        ],
+        "region": "eu-central-1"
+      },
+      "localization_config": {},
+      "cloud_deployments": {},
+      "monitoring_setup": {},
+      "deployment_time": 0,
+      "error": "Compliance validation failed: []"
+    },
+    "ap-southeast-1": {
+      "region": "ap-southeast-1",
+      "status": "failed",
+      "compliance_validation": {
+        "compliant": false,
+        "compliance_score": 0.0,
+        "violations": [
+          "No compliance configuration for region ap-southeast-1"
+        ],
+        "recommendations": [],
+        "region": "ap-southeast-1"
+      },
+      "localization_config": {},
+      "cloud_deployments": {},
+      "monitoring_setup": {},
+      "deployment_time": 0,
+      "error": "Compliance validation failed: ['No compliance configuration for region ap-southeast-1']"
+    }
+  },
+  "overall_status": "failed",
+  "compliance_validation": {
+    "us-east-1": {
+      "compliant": false,
+      "compliance_score": 0.75,
+      "violations": [
+        "GDPR requires data residency in EU"
+      ],
+      "recommendations": [
+        "\u2705 Encryption requirements met for GDPR",
+        "Consider adding privacy notice alerts",
+        "\u2705 HIPAA encryption requirements met",
+        "\u2705 HIPAA audit logging enabled",
+        "\u2705 HIPAA access controls implemented"
+      ],
+      "region": "us-east-1"
+    },
+    "eu-central-1": {
+      "compliant": false,
+      "compliance_score": 0.8571428571428571,
+      "violations": [],
+      "recommendations": [
+        "\u2705 Encryption requirements met for GDPR",
+        "\u2705 Data residency requirements configured",
+        "Consider adding privacy notice alerts",
+        "\u2705 HIPAA encryption requirements met",
+        "\u2705 HIPAA audit logging enabled",
+        "\u2705 HIPAA access controls implemented"
+      ],
+      "region": "eu-central-1"
+    },
+    "ap-southeast-1": {
+      "compliant": false,
+      "compliance_score": 0.0,
+      "violations": [
+        "No compliance configuration for region ap-southeast-1"
+      ],
+      "recommendations": [],
+      "region": "ap-southeast-1"
+    }
+  },
+  "localization_status": {},
+  "deployment_manifests": {},
+  "monitoring_endpoints": [],
+  "errors": [],
+  "execution_time": 0.0003619194030761719,
+  "success_rate": 0.0
+}
